@@ -1,0 +1,240 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>スマートコントローラー</title>
+<style>
+  :root { --primary: #6a1b9a; --bg: #f3e5f5; --card: #ffffff; --success: #2e7d32; --warn: #f57f17; --err: #c62828; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); color: #333; margin: 0; padding: 0; padding-bottom: 40px; }
+  header { background: var(--primary); color: white; padding: 14px 16px; text-align: center; position: sticky; top: 0; z-index: 100; }
+  header h1 { margin: 0; font-size: 1.2rem; }
+  .card { background: var(--card); border-radius: 10px; padding: 16px; margin: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  h2 { margin: 0 0 12px; font-size: 1rem; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
+  label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 12px; }
+  label span { font-weight: normal; color: #888; font-size: 0.75rem; margin-left: 4px; }
+  input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; margin-top: 4px; }
+  .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; color: white; margin-bottom: 10px; }
+  .btn:active { opacity: 0.75; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-save { background: #4527a0; }
+  .btn-open { background: #1565C0; }
+  .btn-close { background: #c62828; }
+  .btn-time { background: #00838f; }
+  .btn-keep { background: #757575; }
+  .tabs { display: flex; margin: 12px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .tab { flex: 1; padding: 10px; text-align: center; font-size: 0.85rem; font-weight: bold; cursor: pointer; background: #eee; color: #666; }
+  .tab.active { background: var(--primary); color: white; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .result-box { display: none; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin: 8px 0; word-break: break-all; }
+  .result-ok { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+  .result-err { background: #ffebee; color: var(--err); border: 1px solid #ef9a9a; }
+  .result-load { background: #fff8e1; color: var(--warn); border: 1px solid #ffe082; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.2); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="max-width: 220px; margin: 0 auto 8px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>📱 スマートコントローラー</h1>
+</header>
+
+<div class="card">
+  <h2>🎯 ターゲット設定</h2>
+  <form id="config-form" onsubmit="saveConfig(event)">
+    <label>ターゲット 圃場ID <input type="text" name="id" id="f-id" value="__TARGET_ID__" required></label>
+    <label>AUTH_KEY <input type="text" name="auth" id="f-auth" value="__AUTH_KEY__" required></label>
+    <label>LoRa CH (0〜14) <input type="number" name="ch" id="f-ch" value="__MY_CH__" min="0" max="14" required></label>
+    <button type="submit" class="btn btn-save" id="btn-save">💾 設定を保存してCH変更</button>
+    <div id="cfg-res" class="result-box"></div>
+  </form>
+</div>
+
+<div class="tabs">
+  <div class="tab" onclick="switchTab('tab-gw')">GWテスト</div>
+  <div class="tab active" onclick="switchTab('tab-time')">TIME送信</div>
+  <div class="tab" onclick="switchTab('tab-manual')">MANUAL</div>
+  <div class="tab" onclick="switchTab('tab-command')">COMMAND</div>
+</div>
+
+<div id="tab-gw" class="tab-content card">
+  <h2>🌐 GW通信テスト (ダミーDATA送信)</h2>
+  <p style="font-size:0.75rem; color:#666;">
+    ※ゲートウェイへテスト用のDATAパケット(圃場ID:TEST_DATA)を送信し、GWからの応答を待機します。<br>ダミーDATAパケットが正常に受信されていれば、ダミーDATAパケットはクラウドに即時送信され、数秒後にDiscordへTIMEOUTエラー通知が届きます。<br>
+    ※GAS上のLogシートにはダミー数値（水位5.0cm / 12.50V 等）が記録されます。<br>※GWに保存されているIDリストに圃場ID"TEST_DATA"の登録がない場合はTIMEパケットは返送されません。<br>管理用ダッシュボードの表示やDiscord通知の有無で、GWが正常に稼働しているかを確認してください。
+  </p>
+  <button class="btn btn-save" id="btn-g-send" onclick="sendGwDummy()" style="background: #e65100;">📡 ダミーDATA送信</button>
+  <div id="res-gw" class="result-box"></div>
+</div>
+
+<div id="tab-time" class="tab-content active card">
+  <h2>⏱ TIMEパケット送信 (GW模擬)</h2>
+  <p style="font-size:0.75rem; color:#666;">
+    ※ 水位ノードの送信タイミングに合わせて待機します。実行後、対象の水位ノードを再起動等させてDATAパケットを発生させてください。
+  </p>
+  <label>DRY閾値 (cm) <input type="number" id="t-dry" step="0.1" value="2.0"></label>
+  <label>FULL閾値 (cm) <input type="number" id="t-full" step="0.1" value="6.0"></label>
+  <label>稼働モード
+    <select id="t-mode">
+      <option value="RUN">RUN</option><option value="STOP">STOP</option>
+    </select>
+  </label>
+  <button class="btn btn-time" id="btn-time" onclick="sendTime()">📡 DATA待機 ＆ TIME送信</button>
+  <div id="res-time" class="result-box"></div>
+</div>
+
+<div id="tab-manual" class="tab-content card">
+  <h2>🛠 MANUALパケット送信</h2>
+  <p style="font-size:0.75rem; color:#666;">
+    ※MANUALパケットは水門を強制的に駆動させます。水門の駆動に問題がないことを確認してください。
+  </p>
+  <p style="font-size:0.75rem; color:#666;">WAKEUP→(1.5秒)→Normal→(1.5秒)→MANUAL送信</p>
+  <button class="btn btn-open" id="btn-m-open" onclick="sendPacket('manual', 'OPEN')">🟢 開ける (OPEN)</button>
+  <button class="btn btn-close" id="btn-m-close" onclick="sendPacket('manual', 'CLOSE')">🔴 閉める (CLOSE)</button>
+  <div id="res-manual" class="result-box"></div>
+</div>
+
+<div id="tab-command" class="tab-content card">
+  <h2>🤖 COMMANDパケット送信</h2>
+  <p style="font-size:0.75rem; color:#666;">
+    ※COMMANDパケットは水門に問題がある場合エラーとなり、水門が駆動しません。送信前に、水門の駆動に問題がないことを確認してください。
+  </p>
+  <p style="font-size:0.75rem; color:#666;">WAKEUP→(2.0秒)→Normal→(2.0秒)→COMMAND送信</p>
+  <button class="btn btn-open" id="btn-c-open" onclick="sendPacket('command', 'OPEN')">🟢 開ける (OPEN)</button>
+  <button class="btn btn-close" id="btn-c-close" onclick="sendPacket('command', 'CLOSE')">🔴 閉める (CLOSE)</button>
+  <button class="btn btn-keep" id="btn-c-keep" onclick="sendPacket('command', 'KEEP')">⚪ 現状維持 (KEEP)</button>
+  <div id="res-command" class="result-box"></div>
+</div>
+
+<script>
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  function showRes(id, msg, type) {
+    const el = document.getElementById(id);
+    el.innerHTML = msg; el.className = 'result-box result-' + type; el.style.display = 'block';
+  }
+
+  function saveConfig(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    fetch('/save', { method: 'POST', body: new URLSearchParams(fd) })
+      .then(() => showRes('cfg-res', '✅ 設定を保存し、CHを切り替えました。', 'ok'))
+      .catch(() => showRes('cfg-res', '❌ エラーが発生しました。', 'err'));
+  }
+
+  function sendTime() {
+    const btn = document.getElementById('btn-time');
+    btn.disabled = true;
+    showRes('res-time', '<span class="spinner"></span>水位ノードからのDATAパケットを待機中...(最大60秒)', 'load');
+
+    const d = new Date();
+    const body = new URLSearchParams({
+      dry: document.getElementById('t-dry').value,
+      full: document.getElementById('t-full').value,
+      mode: document.getElementById('t-mode').value,
+      y: d.getFullYear(), mo: d.getMonth()+1, d: d.getDate(),
+      h: d.getHours(), m: d.getMinutes(), s: d.getSeconds()
+    });
+
+    fetch('/send_time', { method: 'POST', body: body })
+      .then(r => r.text())
+      .then(txt => showRes('res-time', txt, txt.includes('✅') ? 'ok' : 'err'))
+      .catch(() => showRes('res-time', '❌ 通信エラー', 'err'))
+      .finally(() => btn.disabled = false);
+  }
+
+  function sendPacket(type, action) {
+    const btnO = document.getElementById(`btn-${type.charAt(0)}-open`);
+    const btnC = document.getElementById(`btn-${type.charAt(0)}-close`);
+    const btnK = document.getElementById(`btn-${type.charAt(0)}-keep`); // ★ 追加
+
+    if (btnO) btnO.disabled = true;
+    if (btnC) btnC.disabled = true;
+    if (btnK) btnK.disabled = true; // ★ 追加
+    
+    showRes(`res-${type}`, `<span class="spinner"></span>WAKEUPシーケンス実行＆返信待機中...`, 'load');
+
+    fetch(`/send_${type}`, { method: 'POST', body: new URLSearchParams({ cmd: action }) })
+      .then(r => r.text())
+      .then(txt => showRes(`res-${type}`, txt, txt.includes('✅') ? 'ok' : 'err'))
+      .catch(() => showRes(`res-${type}`, '❌ 通信エラー', 'err'))
+      .finally(() => { 
+        if (btnO) btnO.disabled = false; 
+        if (btnC) btnC.disabled = false; 
+        if (btnK) btnK.disabled = false; // ★ 追加
+      });
+  }
+  
+  function sendGwDummy() {
+    const btn = document.getElementById('btn-g-send');
+    btn.disabled = true;
+    showRes('res-gw', `<span class="spinner"></span>ダミー送信＆GWからの [TIME] 応答を待機中...`, 'load');
+    fetch('/send_dummy_data', { method: 'POST' })
+      .then(r => r.text())
+      .then(txt => showRes('res-gw', txt, txt.includes('✅') ? 'ok' : 'err'))
+      .catch(() => showRes('res-gw', '❌ 通信エラー', 'err'))
+      .finally(() => btn.disabled = false);
+  }
+  
+</script>
+</body>
+</html>

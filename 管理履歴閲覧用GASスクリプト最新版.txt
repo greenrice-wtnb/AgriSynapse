@@ -1,0 +1,209 @@
+/*
+ * Copyright (C) 2026 AgriSynapse Project
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+// ★ エディタから手動実行するための初期セットアップ用関数
+function myFunction() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss.getSheetByName("DashBoard")) {
+    ss.insertSheet("DashBoard").appendRow(["B1セルに任意の圃場IDを入力→"]);
+  }
+  if (!ss.getSheetByName("History")) {
+    ss.insertSheet("History").appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full", "E_Log"]);
+  }
+  if (!ss.getSheetByName("E_Log")) {
+    const eLogSheet = ss.insertSheet("E_Log");
+    eLogSheet.getRange("A1").setFormula("=GET_EVENT_LOG(DashBoard!B1)");
+  }
+  SpreadsheetApp.getUi().alert("✅ 初期シートの作成が完了しました！");
+}
+
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('index')
+    .evaluate()
+    .setTitle("管理履歴閲覧ダッシュボード")
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// =========================================================
+// ★ 軽量初回取得: 全ノードの最新ステータスのみ返す
+//   履歴データは含まない。ページ初期表示・ダッシュボードカード描画用。
+// =========================================================
+function getLatestStatusAll() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const histSheet = ss.getSheetByName("History");
+  let logData = [];
+
+  if (histSheet) {
+    const lastRow = histSheet.getLastRow();
+    // 最新500件だけスキャンして各IDの最新行を取得（軽量）
+    const scanCount = Math.min(500, lastRow - 1);
+    const startRow = Math.max(2, lastRow - scanCount + 1);
+    const numRows = lastRow - startRow + 1;
+
+    if (numRows > 0) {
+      const rawData = histSheet.getRange(startRow, 1, numRows, 16).getValues();
+      const latestMap = new Map();
+      // 新しい順（末尾から）にスキャンして最初に出現したIDを最新とする
+      for (let i = rawData.length - 1; i >= 0; i--) {
+        const row = rawData[i];
+        const id = row[1];
+        if (id && !latestMap.has(id)) latestMap.set(id, row);
+      }
+      logData = Array.from(latestMap.values()).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+    }
+  }
+  return JSON.stringify({ log: logData, history: [] });
+}
+
+// =========================================================
+// ★ ID指定履歴取得: 指定ノードIDの履歴のみ返す（最大500件）
+//   ユーザーがIDをセレクトした時点で呼び出す。
+// =========================================================
+function getDataForWeb(targetId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const histSheet = ss.getSheetByName("History");
+  let historyData = [];
+  let logData = [];
+
+  if (histSheet) {
+    const lastRow = histSheet.getLastRow();
+    // ★ 全行を一括取得してフィルタする（getValues一発の方がAPI呼び出し回数が少なく高速）
+    const fetchCount = Math.min(4500, lastRow - 1);
+    const startRow = Math.max(2, lastRow - fetchCount + 1);
+    const numRows = lastRow - startRow + 1;
+
+    if (numRows > 0) {
+      const rawData = histSheet.getRange(startRow, 1, numRows, 16).getValues();
+
+      // 指定IDのみ抽出して新しい順に並べ、最大500件
+      historyData = rawData
+        .filter(row => row[1] === targetId)
+        .reverse()
+        .slice(0, 500);
+
+      // 最新ステータスも同時に返す（ダッシュボードカード更新用）
+      const latestMap = new Map();
+      for (let i = rawData.length - 1; i >= 0; i--) {
+        const row = rawData[i];
+        const id = row[1];
+        if (id && !latestMap.has(id)) latestMap.set(id, row);
+      }
+      logData = Array.from(latestMap.values()).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+    }
+  }
+  return JSON.stringify({ log: logData, history: historyData });
+}
+
+// =========================================================
+// ★夜間バッチ処理: Historyシートが5万行を超えたら退避してクリア
+// =========================================================
+function archiveHistorySheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const histSheet = ss.getSheetByName("History");
+  if (!histSheet) return;
+  const lastRow = histSheet.getLastRow();
+  if (lastRow > 50000) {
+    let maxIdx = 0;
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      const name = sheets[i].getName();
+      const match = name.match(/^CopiedHistory-\((\d+)\)$/);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        if (val > maxIdx) maxIdx = val;
+      }
+    }
+    const newName = `CopiedHistory-(${maxIdx + 1})`;
+    const copiedSheet = histSheet.copyTo(ss);
+    copiedSheet.setName(newName);
+    if (lastRow > 1) {
+      histSheet.getRange(2, 1, lastRow - 1, histSheet.getLastColumn()).clearContent();
+    }
+    console.log(`Archived History to ${newName}`);
+  }
+}
+
+function setupArchiveTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "archiveHistorySheet") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("archiveHistorySheet")
+    .timeBased()
+    .everyDays(1)
+    .atHour(2)
+    .create();
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('⚙️ データベース設定')
+    .addItem('自動アーカイブ開始 (深夜2時実行)', 'setupArchiveTrigger')
+    .addToUi();
+}
+
+// =========================================================
+// ★ E_Logビュー用 カスタム関数（履歴展開機能）
+// =========================================================
+function GET_EVENT_LOG(targetId) {
+  if (!targetId || targetId === "") return [["日時", "イベントコード", "イベント内容"]];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const histSheet = ss.getSheetByName("History");
+  if (!histSheet) return [["Historyシートが見つかりません"]];
+
+  const data = histSheet.getRange(1, 1, histSheet.getLastRow(), 16).getValues();
+  let result = [["日時", "イベントコード", "イベント内容"]];
+
+  const EVENT_DICT = {
+    "101": "LTEモジュール初期化開始",
+    "102": "✅ LTEネットワーク接続確立",
+    "103": "⚠️ SHCONN失敗・IP強制リフレッシュ実行",
+    "104": "⚠️ WiFiチップ異常・再接続",
+    "105": "⚠️ HTTP通信失敗",
+    "201": "LoRaデータ受信",
+    "202": "🟢 水門へMANUAL指示送信(OPEN)",
+    "203": "LoRa受信エラー・データ破棄",
+    "205": "🔴 水門へMANUAL指示送信(CLOSE)",
+    "206": "⏱ タイムアウト強制MANUAL送信",
+    "207": "📡 TIMEパケット送信(RUNモード)",
+    "208": "🛑 TIMEパケット送信(STOPモード)",
+    "301": "深夜のメンテナンス定時再起動",
+    "302": "USBによるシステム設定の保存"
+  };
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const date = row[0];
+    const id = row[1];
+    const eLogStr = row[15];
+    if (id === targetId && eLogStr && String(eLogStr).trim() !== "") {
+      const codes = String(eLogStr).split('|');
+      for (let j = 0; j < codes.length; j++) {
+        let codeRaw = codes[j].trim();
+        if (!codeRaw) continue;
+        let atIdx = codeRaw.indexOf('@');
+        let rtcTime = "";
+        let codeBody = codeRaw;
+        if (atIdx !== -1) {
+          rtcTime = codeRaw.substring(atIdx + 1);
+          codeBody = codeRaw.substring(0, atIdx);
+        }
+        let parts = codeBody.split(':');
+        let mainCode = parts[0];
+        let extra = parts.length > 1 ? ` [${parts[1]}]` : "";
+        let timeStr = rtcTime ? ` (発生: ${rtcTime})` : "";
+        let decodedStr = (EVENT_DICT[mainCode] || "不明なイベント") + extra + timeStr;
+        result.push([date, codeBody, decodedStr]);
+      }
+    }
+  }
+  if (result.length === 1) result.push(["", "", "イベントログはありません"]);
+  return result;
+}

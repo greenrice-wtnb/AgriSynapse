@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="100%">
+  <defs>
+    <!-- 上部から下部（緑から青）へと真っ直ぐ落ちるグラデーション -->
+    <!-- gradientUnits="userSpaceOnUse" を追加し、垂直線の0幅bboxによる行列特異エラーを回避 -->
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34C759" /> <!-- 明るくビビッドなリーフグリーン -->
+      <stop offset="100%" stop-color="#007AFF" /> <!-- 明るくクリアなウォーターブルー -->
+    </linearGradient>
+  </defs>
+
+  <!-- 主脈（葉脈の中心線・葉柄） -->
+  <!-- 頂点から下点へ貫く直線を1本独立させ、下部に少し突き抜けさせることで「葉」らしさを強調 -->
+  <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+
+  <!-- ネットワーク（葉のシルエットと側脈） -->
+  <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+    <!-- 外枠（葉の輪郭を形成するノード接続） -->
+    <line x1="80" y1="15" x2="35" y2="70" />
+    <line x1="35" y1="70" x2="55" y2="120" />
+    <line x1="55" y1="120" x2="80" y2="145" />
+    <line x1="80" y1="145" x2="105" y2="120" />
+    <line x1="105" y1="120" x2="125" y2="70" />
+    <line x1="125" y1="70" x2="80" y2="15" />
+
+    <!-- 内部ネットワーク（側脈 兼 エッジからGWへの通信経路） -->
+    <line x1="35" y1="70" x2="80" y2="85" />   <!-- 側脈（左上） -->
+    <line x1="55" y1="120" x2="80" y2="85" />  <!-- 側脈（左下） -->
+    <line x1="125" y1="70" x2="80" y2="85" />  <!-- 側脈（右上） -->
+    <line x1="105" y1="120" x2="80" y2="85" /> <!-- 側脈（右下） -->
+  </g>
+
+  <!-- ノード（端末） -->
+  <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+    <!-- エッジノード（葉の縁のポイント） -->
+    <circle cx="80" cy="15" r="6" />
+    <circle cx="35" cy="70" r="6" />
+    <circle cx="55" cy="120" r="6" />
+    <circle cx="80" cy="145" r="6" />
+    <circle cx="105" cy="120" r="6" />
+    <circle cx="125" cy="70" r="6" />
+    
+    <!-- 中央ノード（ゲートウェイ / 脳） -->
+    <circle cx="80" cy="85" r="9" stroke-width="4" />
+  </g>
+
+  <!-- ゲートウェイの鼓動（稼働状態）を表すインジケータ -->
+  <circle cx="80" cy="85" r="3" fill="#007AFF" />
+
+  <!-- システム名称（タイポグラフィ） -->
+  <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+    <tspan fill="#34C759">Agri</tspan><tspan fill="#007AFF">Synapse</tspan>
+  </text>
+
+  <!-- サブタイトル -->
+  <text x="165" y="125" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#666666" letter-spacing="3">
+    AUTONOMOUS FIELD NETWORK
+  </text>
+</svg>

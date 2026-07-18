@@ -1,0 +1,318 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理履歴閲覧ダッシュボード</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --primary: #00796B; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --danger: #c62828; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 80px; }
+    
+    /* ヘッダー */
+    header { background-color: var(--primary); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    h1 { margin: 0; font-size: 1.2rem; }
+    .status-bar { font-size: 0.8rem; margin-top: 5px; opacity: 0.9; }
+
+    /* タブ */
+    .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 60px; z-index: 999; }
+    .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-weight: bold; color: #666; font-size: 0.9rem; }
+    .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: #e0f2f1; }
+
+    /* コンテンツエリア */
+    .content { padding: 15px; display: none; }
+    .content.active { display: block; }
+
+    /* カード */
+    .card { background: var(--card-bg); border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid #ddd; }
+    .card.status-NORMAL { border-left-color: var(--primary); }
+    .card.status-ERROR, .card.status-ACT_ERR { border-left-color: var(--danger); }
+    
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .field-id { font-size: 1.1rem; font-weight: bold; }
+    .timestamp { font-size: 0.8rem; color: #888; }
+    
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem; }
+    .data-item { background: #f9f9f9; padding: 8px; border-radius: 5px; }
+    .label { display: block; font-size: 0.7rem; color: #666; margin-bottom: 2px; }
+    .value { font-weight: bold; font-size: 1.0rem; }
+    
+    .level-bar-bg { background: #eee; height: 10px; border-radius: 5px; margin-top: 5px; overflow: hidden; }
+    .level-bar-fill { height: 100%; background: #2196F3; transition: width 0.3s; }
+
+    /* 履歴リスト */
+    .history-item { background: white; padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .hist-time { font-size: 0.8rem; color: #666; }
+    .hist-id { font-weight: bold; font-size: 0.9rem; }
+    .hist-action { font-size: 0.9rem; padding: 3px 8px; border-radius: 4px; background: #eee; }
+    .act-OPEN { background: #E8F5E9; color: #2E7D32; }
+    .act-CLOSE { background: #FFEBEE; color: #C62828; }
+
+    /* グラフエリア */
+    .graph-controls { margin-bottom: 15px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    select { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #ddd; border-radius: 5px; background: white; }
+    .chart-container { position: relative; height: 350px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .legend-custom { text-align: center; font-size: 0.8rem; color: #666; margin-top: 5px; }
+    .legend-item { display: inline-block; margin: 0 5px; }
+    .dot { display: inline-block; width: 10px; height: 10px; margin-right: 3px; }
+
+    #loading { text-align: center; padding: 20px; color: #666; }
+    .fab { position: fixed; bottom: 20px; right: 20px; background: var(--primary); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); cursor: pointer; font-size: 24px; z-index: 1001; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📊 管理履歴閲覧</h1>
+  <div class="status-bar" id="sysInfo">読み込み中...</div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('dashboard')">現在</div>
+  <div class="tab" onclick="switchTab('history')">履歴</div>
+  <div class="tab" onclick="switchTab('graph')">グラフ</div>
+</div>
+
+<div id="loading">データ取得中...</div>
+
+<div id="dashboard" class="content active">
+  <div id="cards-container"></div>
+</div>
+
+<div id="history" class="content">
+  <div id="history-container"></div>
+</div>
+
+<div id="graph" class="content">
+  <div class="graph-controls">
+    <label for="fieldSelect" class="label">表示する圃場IDを選択:</label>
+    <select id="fieldSelect" onchange="updateChart()"></select>
+  </div>
+  <div class="chart-container">
+    <canvas id="myChart"></canvas>
+  </div>
+  <div class="legend-custom">
+    <span class="legend-item"><span class="dot" style="background:#2E7D32; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></span>開動作</span>
+    <span class="legend-item"><span class="dot" style="background:#C62828;"></span>閉動作</span>
+  </div>
+</div>
+
+<div class="fab" onclick="loadData()">↻</div>
+
+<script>
+  let rawHistory = [];
+  let myChart = null;
+
+  window.onload = loadData;
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // ★修正: エラーハンドラ(withFailureHandler)を追加し、フリーズを防止
+  function loadData() {
+    document.getElementById('loading').style.display = 'block';
+    google.script.run
+      .withSuccessHandler(renderData)
+      .withFailureHandler(function(error) {
+        document.getElementById('loading').style.display = 'none';
+        alert("データ取得エラーが発生しました。\n詳細: " + error.message);
+      })
+      .getDataForWeb();
+  }
+
+  function renderData(rawData) {
+    document.getElementById('loading').style.display = 'none';
+    
+    // ★修正: GASから送られたJSON文字列を正しくJavaScriptのデータに変換
+    let data;
+    try {
+      data = JSON.parse(rawData);
+    } catch(e) {
+      data = rawData;
+    }
+
+    rawHistory = data.history || [];
+
+    // ★修正: 存在しない system.mode ではなく、データ取得完了時刻を表示
+    const nowTime = new Date().toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'});
+    document.getElementById('sysInfo').textContent = `最終更新: ${nowTime}`;
+
+    // カード生成
+    const cardsDiv = document.getElementById('cards-container');
+    cardsDiv.innerHTML = '';
+    
+    if (data.log && data.log.length > 0) {
+      data.log.forEach(row => {
+        if (!row || row.length < 2) return;
+        const ts = new Date(row[0]).toLocaleString('ja-JP', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+        const isErr = row[11] !== 'NORMAL' || row[12] === 'ACT_ERR';
+        const statusClass = isErr ? 'status-ERROR' : 'status-NORMAL';
+        const battClass = (row[9] > 0 && row[9] <= 11.8) ? 'alert' : '';
+        
+        const html = `
+          <div class="card ${statusClass}">
+            <div class="card-header"><div class="field-id">${row[1]}</div><div class="timestamp">${ts}</div></div>
+            <div class="data-grid">
+              <div class="data-item">
+                <span class="label">水位</span>
+                <div class="value">${Number(row[2]).toFixed(2)}cm</div>
+                <div class="level-bar-bg"><div class="level-bar-fill" style="width: ${row[3] ? Number(row[3]) : 0}%"></div></div>
+              </div>
+              <div class="data-item">
+                <span class="label">状態</span>
+                <div class="value">${row[8]}</div>
+                <span class="label">指令: ${row[6]} / 結果: ${row[7] || "-"}</span>
+              </div>
+              <div class="data-item">
+                <span class="label">バッテリー</span>
+                <div class="value" style="${battClass ? 'color:#c62828' : ''}">${Number(row[9]).toFixed(1)}V</div>
+              </div>
+              <div class="data-item">
+                <span class="label">水門Pico電圧</span>
+                <div class="value" style="${(row[5] > 0 && row[5] < 2.6) ? 'color:#c62828' : ''}">${Number(row[5]).toFixed(2)}V</div>
+              </div>
+              <div class="data-item">
+                <span class="label">判定</span>
+                <div class="value" style="${isErr ? 'color:#c62828' : ''}">${isErr ? '異常' : '正常'}</div>
+              </div>
+            </div>
+          </div>`;
+        cardsDiv.insertAdjacentHTML('beforeend', html);
+      });
+    } else {
+      cardsDiv.innerHTML = '<div style="text-align:center; color:#888; padding:20px;">データがありません</div>';
+    }
+
+    // 履歴生成
+    const histDiv = document.getElementById('history-container');
+    histDiv.innerHTML = '';
+    if (data.history && data.history.length > 0) {
+      data.history.forEach(row => {
+        if (!row || row.length < 2) return;
+        const ts = new Date(row[0]).toLocaleString('ja-JP', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+        const actClass = row[8] === 'OPEN' ? 'act-OPEN' : (row[8] === 'CLOSE' ? 'act-CLOSE' : '');
+        const html = `<div class="history-item"><div class="hist-left"><div class="hist-id">${row[1]}</div><div class="hist-time">${ts}</div></div><div class="hist-right"><div class="hist-action ${actClass}">${row[8] || '-'}</div></div></div>`;
+        histDiv.insertAdjacentHTML('beforeend', html);
+      });
+    }
+
+    // グラフ用セレクトボックス
+    const select = document.getElementById('fieldSelect');
+    select.innerHTML = '';
+    if (data.history) {
+      const uniqueIds = [...new Set(data.history.map(item => item[1]))].sort();
+      uniqueIds.forEach(id => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.text = id;
+        select.appendChild(option);
+      });
+      if (uniqueIds.length > 0) updateChart();
+    }
+  }
+
+  function updateChart() {
+    const selectedId = document.getElementById('fieldSelect').value;
+    if (!selectedId) return;
+    
+    // データをフィルタリングして古い順に
+    const filteredData = rawHistory.filter(row => row[1] === selectedId).reverse();
+
+    const labels = [];
+    const waterLevels = [];
+    const pointColors = [];
+    const pointStyles = [];
+    const pointRadii = [];
+    const gateStatuses = [];
+
+    filteredData.forEach(row => {
+      const d = new Date(row[0]);
+      labels.push(`${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`);
+      waterLevels.push(row[2]); // 水位
+      
+      const status = row[8]; // Gate_Status
+      gateStatuses.push(status);
+
+      if (status === 'OPEN') {
+        pointColors.push('#2E7D32'); // 緑
+        pointStyles.push('triangle');
+        pointRadii.push(6); // 大きく目立たせる
+      } else if (status === 'CLOSE') {
+        pointColors.push('#C62828'); // 赤
+        pointStyles.push('rect');
+        pointRadii.push(6); // 大きく目立たせる
+      } else {
+        pointColors.push('rgba(33, 150, 243, 0.5)');
+        pointStyles.push('circle');
+        pointRadii.push(0); // 通常時は点を描画しない（線のみ）
+      }
+    });
+
+    const ctx = document.getElementById('myChart').getContext('2d');
+
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '水位 (V)',
+          data: waterLevels,
+          borderColor: '#2196F3',
+          backgroundColor: 'rgba(33, 150, 243, 0.1)',
+          borderWidth: 2,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointColors,
+          pointStyle: pointStyles,
+          pointRadius: pointRadii,
+          tension: 0.1,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                // 水門操作があった場合のみツールチップに表示
+                const idx = context.dataIndex;
+                const st = gateStatuses[idx];
+                if (st === 'OPEN' || st === 'CLOSE') {
+                  return `操作: ${st}`;
+                }
+                return null;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: '水位 (V)' },
+            max: 3.5
+          }
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>

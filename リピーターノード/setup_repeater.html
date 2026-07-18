@@ -1,0 +1,279 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>リピーターノード 設定</title>
+<style>
+  :root {
+    --primary: #6A1B9A;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --danger: #c62828;
+    --success: #2E7D32;
+    --warn: #f57f17;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: #333; margin: 0; padding: 0;
+    padding-bottom: 40px;
+  }
+  header {
+    background: var(--primary); color: white;
+    padding: 14px 16px; text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { margin: 0; font-size: 1.1rem; }
+  header p  { margin: 4px 0 0; font-size: 0.75rem; opacity: 0.85; }
+
+  .card {
+    background: var(--card); border-radius: 10px;
+    padding: 16px; margin: 12px; 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 0.95rem;
+    color: var(--primary); border-bottom: 2px solid var(--primary);
+    padding-bottom: 6px;
+  }
+
+  label {
+    display: block; font-size: 0.85rem;
+    font-weight: bold; color: #555; margin-bottom: 12px;
+  }
+  label span { font-weight: normal; color: #888; font-size: 0.75rem; margin-left: 4px; }
+  input[type="text"], input[type="number"], select {
+    display: block; width: 100%; padding: 10px;
+    border: 1px solid #ccc; border-radius: 6px;
+    font-size: 1rem; margin-top: 4px; background: white;
+  }
+  input:focus, select:focus {
+    border-color: var(--primary); outline: none;
+    box-shadow: 0 0 0 2px rgba(106,27,154,0.15);
+  }
+
+  .status-box {
+    background: #f3e5f5; border-left: 4px solid var(--primary);
+    border-radius: 6px; padding: 10px 12px;
+    font-size: 0.85rem; margin-bottom: 10px;
+  }
+  .status-box .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .status-box .label { color: #555; }
+  .status-box .value { font-weight: bold; color: #4a148c; }
+
+  .info-box {
+    background: #fff8e1; border-left: 4px solid var(--warn);
+    border-radius: 6px; padding: 10px 12px;
+    font-size: 0.8rem; color: #5d4037; margin-bottom: 14px;
+  }
+
+  .btn {
+    display: block; width: 100%; padding: 13px;
+    border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: bold; cursor: pointer;
+    color: white; margin-bottom: 10px;
+    transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.75; }
+  .btn-save    { background: var(--success); }
+
+  #timeout-bar-wrap {
+    background: #e0e0e0; border-radius: 4px;
+    height: 6px; margin: 10px 0 4px; overflow: hidden;
+  }
+  #timeout-bar {
+    height: 100%; background: var(--warn);
+    transition: width 1s linear;
+  }
+  #timeout-text { font-size: 0.75rem; color: #777; text-align: right; }
+
+  #msg {
+    display: none; padding: 12px; border-radius: 8px;
+    font-size: 0.9rem; font-weight: bold; margin: 10px 0;
+    text-align: center;
+  }
+  #msg.ok  { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+  #msg.err { background: #ffebee; color: var(--danger);  border: 1px solid #ef9a9a; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite; vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="max-width: 220px; margin: 0 auto 8px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>📡 リピーターノード 現地設定</h1>
+  <p>PicoW APモード設定 — <strong>192.168.4.1</strong></p>
+</header>
+
+<div class="card">
+  <h2>📊 現在のノード状態</h2>
+  <div class="status-box">
+    <div class="row"><span class="label">ノードID</span><span class="value" id="disp-id">__FIELD_ID__</span></div>
+    <div class="row"><span class="label">VSYS電圧 (キャッシュ)</span><span class="value" id="disp-vsys">__VSYS__ V</span></div>
+    <div class="row"><span class="label">12Vバッテリー</span><span class="value" id="disp-12v">__V12__ V</span></div>
+  </div>
+
+  <div id="timeout-bar-wrap"><div id="timeout-bar" style="width:100%;"></div></div>
+  <div id="timeout-text">設定を保存するか、このまま待つと通常稼働に移行します</div>
+</div>
+
+<div class="card">
+  <h2>⚙️ 中継・通信設定</h2>
+
+  <div class="info-box">
+    💡 <strong>RX (待受) CH</strong> は子機（水位/水門）に合わせてください。<br>
+    <strong>TX (転送先) CH</strong> は親機（ゲートウェイ）のCHを指定します。
+  </div>
+
+  <form id="config-form" action="/save" method="post">
+    <label>リピーターID <span>半角英数・ハイフン・アンダーバーのみ</span>
+      <input type="text" name="id" id="f-id" value="__FIELD_ID__"
+             pattern="[A-Za-z0-9_\-]+" required>
+    </label>
+
+    <label>AUTH_KEY <span>グループ認証キー</span>
+      <input type="text" name="auth" id="f-auth" value="__AUTH_KEY__" required>
+    </label>
+
+    <div style="display: flex; gap: 10px;">
+      <div style="flex: 1;">
+        <label>RX (待受) CH <span>0〜14</span>
+          <input type="number" name="rx_ch" id="f-rx-ch" value="__RX_CH__" min="0" max="14" required>
+        </label>
+      </div>
+      <div style="flex: 1;">
+        <label>TX (転送先) CH <span>0〜14</span>
+          <input type="number" name="tx_ch" id="f-tx-ch" value="__TX_CH__" min="0" max="14" required>
+        </label>
+      </div>
+    </div>
+
+    <label>送信オフセット <span>分 / 自己レポート送信用</span>
+      <input type="number" name="offset" id="f-offset" value="__OFFSET_MIN__" min="0" max="9">
+    </label>
+
+    <label>稼働モード
+      <select name="mode" id="f-mode">
+        <option value="RUN"  id="opt-run">RUN（中継稼働）</option>
+        <option value="STOP" id="opt-stop">STOP（停止）</option>
+      </select>
+    </label>
+
+    <button type="submit" class="btn btn-save" id="btn-save" style="margin-top: 15px;">
+      💾 設定を保存して再起動
+    </button>
+  </form>
+</div>
+<div id="msg"></div>
+
+<script>
+  // ── 現在のモード初期値を設定 ──
+  const currentMode = "__MODE__";
+  if (currentMode === "STOP") document.getElementById('opt-stop').selected = true;
+  else                        document.getElementById('opt-run').selected  = true;
+
+  // ── タイムアウトバー (180秒カウントダウン) ──
+  const TIMEOUT_SEC = 180;
+  let remaining = TIMEOUT_SEC;
+  const bar  = document.getElementById('timeout-bar');
+  const text = document.getElementById('timeout-text');
+
+  const timer = setInterval(() => {
+    remaining--;
+    const pct = (remaining / TIMEOUT_SEC) * 100;
+    bar.style.width = pct + '%';
+    bar.style.background = pct > 50 ? '#f57f17' : pct > 20 ? '#e65100' : '#c62828';
+    text.textContent = `通常稼働への自動移行まで: ${remaining}秒`;
+    if (remaining <= 0) clearInterval(timer);
+  }, 1000);
+
+  // ── フォーム送信 ──
+  document.getElementById('config-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save');
+    btn.innerHTML = '<span class="spinner"></span>保存中...';
+    btn.disabled = true;
+    clearInterval(timer);
+
+    const fd = new FormData(this);
+    fetch('/save', { method: 'POST', body: new URLSearchParams(fd) })
+      .then(r => r.text())
+      .then(() => {
+        showMsg('✅ 保存しました。数秒後に再起動します...', 'ok');
+      })
+      .catch(() => {
+        showMsg('❌ 保存に失敗しました。再試行してください。', 'err');
+        btn.innerHTML = '💾 設定を保存して再起動';
+        btn.disabled = false;
+      });
+  });
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text;
+    el.className = type;
+    el.style.display = text ? 'block' : 'none';
+  }
+</script>
+</body>
+</html>

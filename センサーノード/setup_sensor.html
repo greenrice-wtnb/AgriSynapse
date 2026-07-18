@@ -1,0 +1,301 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>センサーノード 設定</title>
+<style>
+  :root { --primary: #1565C0; --bg: #f0f4f8; --card: #ffffff; --danger: #c62828; --success: #2E7D32; --warn: #f57f17; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); color: #333; margin: 0; padding: 0; padding-bottom: 40px; }
+  header { background: var(--primary); color: white; padding: 14px 16px; text-align: center; position: sticky; top: 0; z-index: 100; }
+  header h1 { margin: 0; font-size: 1.1rem; }
+  header p  { margin: 4px 0 0; font-size: 0.75rem; opacity: 0.85; }
+  .card { background: var(--card); border-radius: 10px; padding: 16px; margin: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  h2 { margin: 0 0 12px; font-size: 0.95rem; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
+  label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin-bottom: 12px; }
+  label span { font-weight: normal; color: #888; font-size: 0.75rem; margin-left: 4px; }
+  input[type="text"], input[type="number"], select { display: block; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; margin-top: 4px; background: white; }
+  .status-box { background: #e8f5e9; border-left: 4px solid var(--success); border-radius: 6px; padding: 10px 12px; font-size: 0.85rem; margin-bottom: 10px; }
+  .status-box .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .status-box .value { font-weight: bold; color: #1b5e20; }
+  .info-box { background: #e3f2fd; border-left: 4px solid #1e88e5; border-radius: 6px; padding: 10px 12px; font-size: 0.8rem; color: #0d47a1; margin-bottom: 14px; }
+  .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; color: white; margin-bottom: 10px; }
+  .btn-save { background: var(--success); }
+  .btn-calib { background: #6a1b9a; }
+  .btn-measure { background: #00695c; }
+  .measure-result { display: none; background: #e0f2f1; border-left: 4px solid #00695c; border-radius: 6px; padding: 12px 14px; margin-top: 10px; }
+  .measure-result .level-val { font-size: 2rem; font-weight: bold; color: #004d40; text-align: center; margin: 6px 0; }
+  .measure-result .level-sub { font-size: 0.8rem; color: #00695c; text-align: center; }
+  #msg { display: none; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-weight: bold; margin: 10px 0; text-align: center; }
+  #msg.ok { background: #e8f5e9; color: var(--success); border: 1px solid #a5d6a7; }
+  #msg.err { background: #ffebee; color: var(--danger); border: 1px solid #ef9a9a; }
+  #msg.warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .two-col { display: flex; gap: 10px; }
+  .two-col label { flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="max-width: 220px; margin: 0 auto 8px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>センサーノード 現地設定</h1>
+  <p>PicoW APモード設定 — <strong>192.168.4.1</strong></p>
+</header>
+
+<div class="card">
+  <h2>📊 現在のノード状態</h2>
+  <div class="status-box">
+    <div class="row"><span>ノードID</span><span class="value">__FIELD_ID__</span></div>
+    <div class="row"><span>VSYS電圧</span><span class="value">__VSYS__ V</span></div>
+    <div class="row"><span>基準距離</span><span class="value" id="disp-base">__BASE_DIST__ cm</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>⚙️ 動作設定</h2>
+  <div class="info-box">
+    💡 ここで閾値を保存すると、再起動後にスマホのネット復帰を自動検知し、クラウド(GAS)にも自動で設定を同期します。
+  </div>
+
+  <form id="config-form">
+    <label>ノードID <span>半角英数・ハイフンのみ</span>
+      <input type="text" name="id" id="f-id" value="__FIELD_ID__" required>
+    </label>
+
+    <div class="two-col">
+      <label>DRY閾値 (cm)
+        <input type="number" name="dry" id="f-dry" value="__TH_DRY__" step="0.1" required>
+      </label>
+      <label>FULL閾値 (cm)
+        <input type="number" name="full" id="f-full" value="__TH_FULL__" step="0.1" required>
+      </label>
+    </div>
+
+    <label>稼働モード
+      <select name="mode" id="f-mode">
+        <option value="RUN"  id="opt-run">RUN（自動稼働）</option>
+        <option value="STOP" id="opt-stop">STOP（停止）</option>
+      </select>
+    </label>
+
+    <label>AUTH_KEY
+      <input type="text" name="auth" value="__AUTH_KEY__" required>
+    </label>
+
+    <div class="two-col">
+      <label>LoRa CH (0-14)
+        <input type="number" name="ch" value="__MY_CH__" min="0" max="14" required>
+      </label>
+      <label>送信オフセット (分)
+        <input type="number" name="offset" value="__OFFSET_MIN__" min="0" max="28">
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-save" id="btn-save">💾 設定を保存してクラウド同期</button>
+  </form>
+  <div id="msg"></div>
+</div>
+
+<div class="card">
+  <h2>📏 センサー キャリブレーション</h2>
+  <p style="font-size:0.85rem; color:#555; margin-top:0;">判定基準となる基準距離を測定・記憶します。</p>
+  <button class="btn btn-calib" onclick="doCalibrate()" id="btn-calib">📐 キャリブレーション実行</button>
+
+  <hr style="border:0; border-top:1px solid #eee; margin: 14px 0;">
+  <p style="font-size:0.85rem; color:#555; margin-top:0;">キャリブレーション済みの基準距離をもとに、現在の水位を計測します。</p>
+  <button class="btn btn-measure" onclick="doMeasure()" id="btn-measure">📡 現在の状態を測定する</button>
+  <div class="measure-result" id="measure-result">
+    <div class="level-val" id="measure-level-val">-- cm</div>
+    <div class="level-sub" id="measure-level-sub">センサー距離: --cm 基準距離: --cm</div>
+  </div>
+</div>
+
+<script>
+  if ("__MODE__" === "STOP") document.getElementById('opt-stop').selected = true;
+  else                       document.getElementById('opt-run').selected  = true;
+
+  // ★ ここに、CloudflareWorkersにデプロイした「管理用GASの302リダイレクト追従用プロキシサーバーJavaScript」のURLを入力してください↓
+  const GAS_PROXY_URL = "https://gas-proxy.XXXXXXXX.workers.dev/";
+
+  document.getElementById('config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save');
+    const msgEl = document.getElementById('msg');
+    btn.innerHTML = '<span class="spinner"></span>Picoに保存中...';
+    btn.disabled = true;
+
+    const fd = new FormData(this);
+    const fid  = document.getElementById('f-id').value;
+    const dry  = document.getElementById('f-dry').value;
+    const full = document.getElementById('f-full').value;
+    const mode = document.getElementById('f-mode').value;
+    // ★ 追加: auth・ch・offset もGASに同期する
+    const auth   = this.querySelector('[name="auth"]').value.trim();
+    const ch     = this.querySelector('[name="ch"]').value;
+    const offset = this.querySelector('[name="offset"]').value;
+
+    try {
+      // 1. まずPicoに保存 (Picoは保存後自動で再起動してWi-Fiが切れる)
+      await fetch('/save', { method: 'POST', body: new URLSearchParams(fd) });
+      
+      showMsg('保存完了！<br>再起動によりWi-Fiが切断されます。<br><br><span class="spinner" style="border-top-color:#e65100;"></span> <b>スマホの4G/5G回線への自動復帰を待機しています...</b>', 'warn');
+      btn.innerHTML = 'インターネット復帰待ち...';
+
+      // 2. スマホがPicoのAPから切断され、通常のネットに復帰したかチェックするループ
+      let isOnline = false;
+      while (!isOnline) {
+        await new Promise(r => setTimeout(r, 2000)); // 2秒ごとにチェック
+        try {
+          // Google等の外部サイトにフェッチできればネット復帰とみなす
+          await fetch('https://www.google.com/favicon.ico', { mode: 'no-cors', cache: 'no-cache' });
+          isOnline = true;
+        } catch (err) {
+          // fetch失敗 = まだPicoのAPに繋がっているか、ネット切断状態
+        }
+      }
+
+      // 3. ネット復帰を確認したら、GASのプロキシへ設定値を送信
+      showMsg('インターネット接続を確認しました！<br><span class="spinner" style="border-top-color:#1b5e20;"></span> クラウド(GAS)へ設定を同期中...', 'ok');
+      btn.innerHTML = 'クラウド同期中...';
+
+      const gasUrl = `${GAS_PROXY_URL}?set_threshold=1&id=${encodeURIComponent(fid)}&dry_v=${dry}&full_v=${full}&mode=${mode}&auth=${encodeURIComponent(auth)}&ch=${ch}&offset=${offset}`;
+      const gasRes = await fetch(gasUrl);
+      
+      if(gasRes.ok) {
+        showMsg('✅ すべての保存とクラウド同期が完了しました！<br>このページを閉じてください。', 'ok');
+        btn.innerHTML = '完了';
+      } else {
+        throw new Error("GAS Error");
+      }
+
+    } catch (err) {
+      showMsg('❌ クラウドへの同期に失敗しました。電波の良い場所で再度ダッシュボードから設定してください。', 'err');
+      btn.innerHTML = '💾 設定を保存してクラウド同期';
+      btn.disabled = false;
+    }
+  });
+
+  function doMeasure() {
+    const btn = document.getElementById('btn-measure');
+    const resultBox = document.getElementById('measure-result');
+    const levelVal = document.getElementById('measure-level-val');
+    const levelSub = document.getElementById('measure-level-sub');
+
+    btn.innerHTML = '<span class="spinner"></span>計測中（約10秒）...';
+    btn.disabled = true;
+    resultBox.style.display = 'none';
+
+    fetch('/measure', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        resultBox.style.display = 'block';
+        if (data.ok && data.level_cm !== null) {
+          levelVal.textContent = data.level_cm + ' cm';
+          levelVal.style.color = '#004d40';
+          levelSub.textContent =
+            `センサー距離: ${data.dist_cm}cm 基準距離: ${data.base_cm}cm`;
+        } else if (data.dist_cm !== null) {
+          // キャリブレーション未実施でも生距離は表示
+          levelVal.textContent = '-- cm';
+          levelVal.style.color = '#e65100';
+          levelSub.textContent =
+            `⚠️ ${data.error} センサー距離: ${data.dist_cm}cm`;
+        } else {
+          levelVal.textContent = 'エラー';
+          levelVal.style.color = '#c62828';
+          levelSub.textContent = `❌ ${data.error}`;
+        }
+        btn.innerHTML = '📡 現在の水位を測定する';
+        btn.disabled = false;
+      })
+      .catch(() => {
+        showMsg('❌ 計測中に通信エラーが発生しました。', 'err');
+        btn.innerHTML = '📡 現在の水位を測定する';
+        btn.disabled = false;
+      });
+  }
+
+  function doCalibrate() {
+    const btn = document.getElementById('btn-calib');
+    btn.innerHTML = '<span class="spinner"></span>計測中（約10秒）...';
+    btn.disabled = true;
+    showMsg('', '');
+
+    fetch('/calibrate', { method: 'POST' })
+      .then(r => r.text())
+      .then(txt => {
+        showMsg(txt, 'ok');
+        btn.innerHTML = '📐 キャリブレーション実行';
+        btn.disabled = false;
+        const m = txt.match(/([\d.]+)cm/);
+        if (m) document.getElementById('disp-base').textContent = m[1] + ' cm';
+      })
+      .catch(() => {
+        showMsg('❌ 通信エラー。', 'err');
+        btn.innerHTML = '📐 キャリブレーション実行';
+        btn.disabled = false;
+      });
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.innerHTML = text;
+    el.className = type;
+    el.style.display = text ? 'block' : 'none';
+  }
+</script>
+</body>
+</html>

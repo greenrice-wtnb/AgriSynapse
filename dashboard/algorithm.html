@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriSynapse管理システム 全体アルゴリズム フローチャート</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #f0f4f8; color: #1a202c; }
+  header { background: #2d3748; color: white; padding: 16px 24px; text-align: center; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header p { font-size: 0.8rem; color: #a0aec0; margin-top: 4px; }
+
+  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; background: #e2e8f0; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 20px; cursor: pointer; border-radius: 8px 8px 0 0;
+    font-size: 0.85rem; font-weight: 600; border: none;
+    background: #cbd5e0; color: #4a5568; transition: all 0.2s;
+  }
+  .tab.active { background: white; color: #2d3748; box-shadow: 0 -2px 6px rgba(0,0,0,0.1); }
+  .tab:hover:not(.active) { background: #b2bec7; }
+
+  .content { background: white; margin: 0 0 24px 0; padding: 24px; min-height: 600px; }
+  /* Mermaidの初期化エラーを防ぐため、display:noneの代わりに配置で隠す処理を併用 */
+  .panel { height: 0; overflow: hidden; opacity: 0; position: absolute; pointer-events: none; visibility: hidden; }
+  .panel.active { height: auto; overflow: visible; opacity: 1; position: relative; pointer-events: auto; visibility: visible; }
+
+  .panel-header { margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e2e8f0; }
+  .panel-header h2 { font-size: 1.1rem; color: #2d3748; }
+  .panel-header p { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+
+  .diagram-grid { display: grid; gap: 24px; }
+  .diagram-grid.cols2 { grid-template-columns: 1fr 1fr; }
+  .diagram-grid.cols1 { grid-template-columns: 1fr; }
+
+  .diagram-box { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+  .diagram-box h3 { font-size: 0.85rem; color: #4a5568; margin-bottom: 12px; font-weight: 700;
+    background: #edf2f7; padding: 6px 10px; border-radius: 4px; }
+
+  .mermaid { display: flex; justify-content: center; }
+  .mermaid svg { max-width: 100%; height: auto; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding: 12px;
+    background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #4a5568; }
+  .legend-color { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; }
+
+  @media (max-width: 900px) {
+    .diagram-grid.cols2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="max-width: 250px; margin: 0 auto 10px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>🌾 水田管理システム — 全体アルゴリズム フローチャート</h1>
+  <p>ハードウェアノード ＋ Web・クラウドバックエンド（Proxy / GAS / UI）統合版</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="show(event, 'water')">💧 センサーノード</button>
+  <button class="tab" onclick="show(event, 'gate')">🚪 アクチュエーターノード</button>
+  <button class="tab" onclick="show(event, 'gw_wifi')">📡 GW (Wi-Fi)</button>
+  <button class="tab" onclick="show(event, 'gw_lte')">📶 GW (LTE)</button>
+  <button class="tab" onclick="show(event, 'proxy')">🌐 CF Proxy</button>
+  <button class="tab" onclick="show(event, 'gas_main')">☁️ 管理用GAS</button>
+  <button class="tab" onclick="show(event, 'dash_main')">💻 メインUI</button>
+  <button class="tab" onclick="show(event, 'gas_hist')">📊 履歴GAS/UI</button>
+</div>
+
+<div class="content">
+
+<div id="panel-water" class="panel active">
+  <div class="panel-header">
+    <h2>💧 センサーノード (Pico W + JSN-SR04 超音波センサー)</h2>
+    <p>10分TDMAサイクル動作 / gate_cmd デフォルトKEEP / WOR TX→NORMAL→WOR RX 2段階COMMAND送信 / NORMALモードでRESULT待機→受信後WOR RX / DATA後NORMAL→TIME受信後WOR RX / RESULT・TIME受信とも\n到達まで蓄積してからパース</p>
+  </div>
+  <div class="diagram-grid cols1">
+    <div class="diagram-box">
+      <h3>① 起動フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["起動"]) --> B["safe_shutdown_wifi<br>VSYS計測キャッシュ"]
+  B --> C{"VSYS >= 4.8V?"}
+  C -->|Yes| D["USB設定モード<br>process_usb_serial"]
+  D --> E["load_config"]
+  C -->|No| E
+  E --> F{"skip_ap.flag<br>あり?"}
+  F -->|No| G["APモード設定サーバー<br>3分タイムアウト"]
+  G --> H["load_config"]
+  F -->|Yes| H
+  H --> I["safe_shutdown_wifi"]
+  I --> J["initialize_e220_startup<br>set_lora_ch → WOR RX"]
+  J --> K{"BASE_DIST < 0?"}
+  K -->|Yes| L["calibrate_baseline<br>超音波5回平均"]
+  M(["メインループへ"])
+  K -->|No| M
+  L --> M
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② メインループ — 計測・COMMAND送信フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["ループ開始"]) --> B{"深夜0:00?<br>MAINT"}
+  B -->|Yes| C["safe_reboot"]
+  B -->|No| D["set_mode_wor_rx<br>UART flush"]
+  D --> E["超音波計測<br>get_avg_distance 5回"]
+  E --> F{"計測成功?"}
+  F -->|No| G["sensor_error=True<br>water_level=0"]
+  F -->|Yes| H["water_level計算<br>level_pct計算"]
+  I["load_state<br>gate_statusロード"]
+  G --> I
+  H --> I
+  I --> J{"is_halt?"}
+  J -->|Yes| K["gate_cmd = KEEP"]
+  L{"sensor_error?"}
+  J -->|No| L
+  L -->|Yes| K
+  M{"water_level<br><= TH_DRY?"}
+  L -->|No| M
+  M -->|Yes| N["gate_cmd = OPEN"]
+  O{"water_level<br>>= TH_FULL?"}
+  M -->|No| O
+  O -->|Yes| P["gate_cmd = CLOSE"]
+  O -->|No| K
+  Q["op_status = NO_ACTION"]
+  N --> Q
+  P --> Q
+  K --> Q
+  Q --> R{"is_halt?"}
+  S(["GW報告フローへ"])
+  R -->|Yes| S
+  R -->|No| T["★ 2段階COMMAND送信<br>set_mode_wor_tx<br>send_lora WAKEUP<br>sleep 1500ms<br>set_mode_normal<br>sleep 1500ms<br>send_lora COMMAND<br>wait_aux sleep_ms 500<br>★ NORMALモード維持(WOR RXに戻さない)"]
+  T --> U["★ RESULT待機 30秒<br>NORMALモード ticks_ms精度<br>★ バッファ蓄積:\n到達まで_recv_bufに蓄積\n部分読み取りを防ぐ"]
+  V{"UART有?"}
+  U --> V
+  W{"30秒経過?"}
+  V -->|No| W
+  W -->|No| V
+  W -->|Yes| X["op_status = TIMEOUT<br>★ set_mode_wor_rx"]
+  X --> S
+  V -->|Yes| Y["_recv_buf += uart.read<br>\\n 含む?"]
+  Z{"\\n 未到達?"}
+  Y --> Z
+  Z -->|Yes continue| V
+  Z -->|No 完全受信| ZP["RESULT, 含む?"]
+  ZP -->|No| V
+  AA{"AUTH_KEY<br>一致?"}
+  ZP -->|Yes| AA
+  AA -->|No| V
+  AB["op_status更新<br>★ gate_cmd が KEEP の場合<br>gate_status は上書きしない<br>save_state<br>★ set_mode_wor_rx"]
+  AA -->|Yes| AB
+  AB --> S
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>③ GW報告・TIME受信・スリープフロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["GW報告フローへ"]) --> B{"should_report?<br>25分超 or 状態変化"}
+  F["calc_sleep_ms<br>TDMAスロット計算"]
+  B -->|No| F
+  B -->|Yes| C["set_mode_wor_tx<br>send_lora DATA<br>★ AUX LOW確認(最大100ms)<br>★ wait_aux<br>★ sleep_ms 1000ms<br>★ set_mode_normal<br>(WOR RXライトスリープ不定化リスク排除)"]
+  C --> D["★ NORMALモードでTIME待機 15秒<br>ticks_ms精度<br>★ バッファ蓄積:\n到達まで_recv_bufに蓄積<br>(TIME≈63バイト 部分読み取り防止)"]
+  E{"TIME受信?\n(\\n到達後にパース)"}
+  D --> E
+  E -->|Yes| E2["TH_DRY TH_FULL is_halt更新<br>config.json保存<br>RTC同期"]
+  E3["★ set_mode_wor_rx<br>mins_since_last_gw_sync=0<br>prev状態更新<br>(lightsleep前のコンフィグ(DeepSleep)モードで安全リセット)"]
+  E2 --> E3
+  E -->|No 15秒経過| E3
+  E3 --> F
+  F --> G["gc.collect<br>m0 m1=HIGH設定"]
+  G --> H{"DEBUG_MODE?"}
+  H -->|Yes| I["time.sleep"]
+  H -->|No| J["lightsleep<br>UART再初期化"]
+  K(["ループ先頭へ"])
+  I --> K
+  J --> K
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-gate" class="panel">
+  <div class="panel-header">
+    <h2>🚪 アクチュエーターノード (Pico W + 2chリレー 48MHz動作)</h2>
+    <p>WOR RXライトスリープ待機 / 2段階受信（WAKEUP検出→200ms待機→NORMAL切替→COMMAND/MANUAL待機10秒）/ NORMALモードでRESULT/MANUAL_RES送信→末尾set_mode_wor_rx</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① 起動フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["起動"]) --> A1["machine.freq 125MHz<br>リレー初期化OFF"]
+  A1 --> B["VSYS計測<br>WiFiチップ初期化"]
+  B --> C{"VSYS >= 4.7V?"}
+  C -->|Yes| D["USB設定モード<br>process_usb_serial"]
+  D --> E["load_config<br>load_relay_config<br>load_state"]
+  C -->|No| E
+  E --> F{"skip_ap.flag?"}
+  F -->|No| G["APモード設定サーバー<br>3分 or BOOTSEL"]
+  G --> H["load_config 3回"]
+  F -->|Yes| H
+  H --> I["WiFiチップシャットダウン<br>Pin23=LOW"]
+  I --> J["★ machine.freq 48MHz<br>UART再初期化"]
+  J --> K["initialize_e220_startup<br>set_lora_ch → WOR RX"]
+  K --> L["AUX割り込み設定<br>IRQ_FALLING"]
+  L --> M["set_mode_wor_rx"]
+  N(["メインループへ"])
+  M --> N
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② メインループ — 受信待機フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["ループ開始"]) --> B{"深夜0:00?<br>MAINT"}
+  B -->|Yes| C["machine.freq 125MHz<br>reset"]
+  B -->|No| D{"5分毎<br>manage_charging"}
+  D --> E{"wake_flag=True<br>またはAUX=0?"}
+  P{"raw あり?"}
+  E -->|No| P
+  E -->|Yes| F["aux.irq 割り込み無効化"]
+  F --> G["AUX HIGH待ち<br>最大5秒"]
+  G --> H["★ sleep_ms 200ms<br>UART flush ゴミ捨て"]
+  H --> I["★ set_mode_normal<br>2段階AUX確認"]
+  I --> J["本命パケット待機<br>10秒ウィンドウ"]
+  J --> K{"AUX=0?"}
+  K -->|Yes| L["AUX HIGH待ち<br>sleep 50ms"]
+  L --> M{"★ UART有?"}
+  K -->|No| M
+  M -->|Yes| N{"COMMAND または MANUAL 含む?"}
+  N -->|Yes| O["raw確定 → break"]
+  N -->|No| Q["raw=None"]
+  R{"10秒経過?"}
+  Q --> R
+  M -->|No| R
+  R -->|No| K
+  R -->|Yes| S["raw=None のまま"]
+  O --> T["wake_flag=False<br>IRQ再有効化"]
+  S --> T
+  T --> P
+  U(["パケット処理フローへ"])
+  P -->|Yes| U
+  P -->|No| V["set_mode_wor_rx<br>UART flush"]
+  V --> W{"uart.any?"}
+  W -->|No| X["lightsleep 5000ms<br>UART再初期化"]
+  W -->|Yes| Y["sleep_ms 10"]
+  Z(["ループ先頭へ"])
+  X --> Z
+  Y --> Z
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>③ パケット処理フロー（COMMAND / MANUAL）</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["パケット処理フローへ"]) --> B["safe_ascii_convert<br>COMMAND または MANUAL 抽出"]
+  B --> C{"AUTH_KEY一致?"}
+  Z_RX["★ set_mode_wor_rx<br>2段階AUX確認"]
+  ZZ(["ループ先頭へ"])
+  C -->|No| Z_RX
+  C -->|Yes| D{"FIELD_ID一致?"}
+  D -->|No| Z_RX
+  D -->|Yes| E{"l0 == MANUAL?"}
+  E -->|Yes| F["execute_op<br>maintenance=True"]
+  F --> G["★ sleep 1.5秒<br>受信側(GW)NORMAL確立待機"]
+  G --> H["★ set_mode_normal<br>(プリアンブルなし GWがNORMALで受信)<br>time.sleep_ms(500)<br>(E220モード変更後の安定化待ち)"]
+  I["send_lora MANUAL_RES<br>SUCCESS HALT ACT_ERR LOW_BATT"]
+  H --> I
+  E -->|No| K{"l0 == COMMAND?"}
+  K -->|Yes| L["execute_op<br>maintenance=False"]
+  L --> M["★ sleep 1.5秒<br>受信側(センサーノード)NORMAL確立待機"]
+  M --> N["★ set_mode_normal<br>(プリアンブルなし センサーノードがNORMALで受信)<br>time.sleep_ms(500)<br>(E220モード変更後の安定化待ち)"]
+  N --> O["send_lora RESULT"]
+  K -->|No| Z_RX
+  I --> Z_RX
+  O --> Z_RX
+  Z_RX --> ZZ
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>④ execute_op 詳細</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["execute_op cmd maintenance"]) --> B["get_12v_avg"]
+  B --> C{"v_now > LOW_BATT<br>かつis_act_error?"}
+  C -->|Yes| D["is_act_error=False<br>save_state NORMAL"]
+  E{"is_halt<br>かつnot maintenance?"}
+  D --> E
+  C -->|No| E
+  E -->|Yes| F["return HALT"]
+  G{"is_act_error<br>かつnot maintenance?"}
+  E -->|No| G
+  G -->|Yes| H["return ACT_ERR"]
+  I{"v_now < 11.5V?"}
+  G -->|No| I
+  I -->|Yes| J["is_act_error=True<br>return LOW_BATT"]
+  K{"cmd == OPEN<br>またはCLOSE?"}
+  I -->|No| K
+  K -->|No| L["return SUCCESS<br>リレー操作なし"]
+  K -->|Yes| M{"current_pump_status<br>== cmd<br>かつnot maintenance?"}
+  M -->|Yes| N["return SUCCESS<br>リレー操作なし 即return"]
+  M -->|No| O["drive_motor cmd<br>リレーON"]
+  O --> P["10秒モーター動作<br>100ms毎に電圧監視"]
+  Q{"v < 9.0V?"}
+  P --> Q
+  Q -->|Yes| R["is_act_error=True<br>return ACT_ERR"]
+  Q -->|No| S["drive_motor STOP<br>current_pump_status更新<br>save_state"]
+  S --> T["return SUCCESS"]
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-gw_wifi" class="panel">
+  <div class="panel-header">
+    <h2>📡 ゲートウェイ (Wi-Fi版 Pico W / 125MHz)</h2>
+    <p>LoRa WOR RX常時待機 / ルートA(STOP安全窓10秒/RUN 500ms分岐) / scheduler1(Wi-Fi POST) / scheduler2(LoRa ルートB) / イベントコード分離 / TIME送信はNORMAL(1200ms後) / MANUAL送信後NORMAL維持→MANUAL_RES受信後WOR RX</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① 起動フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["起動"]) --> B["machine.freq 125MHz<br>wlan.active"]
+  B --> C["VSYS計測<br>WL_GPIO1経由"]
+  C --> D["load_wifi_conf<br>load_config<br>load_lora_cmd_queue"]
+  D --> E{"起動時刻チェック<br>定時・メンテ時間?"}
+  E -->|No| F["process_usb_serial<br>VSYS>=4.6Vのみ"]
+  E -->|Yes| G["startup_led_pattern"]
+  F --> G
+  G --> H["setup_wifi NTP同期"]
+  H --> I["sync_fields GET<br>FIELD_CHANNELS取得"]
+  I --> J["initialize_e220_startup<br>set_lora_ch → WOR RX"]
+  J --> K["GWブート通知<br>CHUNK_QUEUEに積む"]
+  K --> L{"LORA_CMD_QUEUE<br>空でない?"}
+  L -->|Yes| M["manual_cmd_deadline<br>=now+35分"]
+  N["set_mode_wor_rx"]
+  L -->|No| N
+  M --> N
+  O(["メインループへ"])
+  N --> O
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② メインループ全体構造</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["ループ開始"]) --> B["manage_charging<br>5秒毎"]
+  C{"ルートC<br>manual_cmd_deadline<br>期限超過?"}
+  B --> C
+  C -->|Yes| D["★ ルートC処理<br>WAKEUP→1500ms<br>→NORMAL→1500ms<br>→MANUAL送信<br>log_event 206<br>★ log_event 202/205"]
+  E{"MAINT時刻?"}
+  D --> E
+  C -->|No| E
+  E -->|Yes| F["router_pwr OFF<br>reset"]
+  E -->|No| G{"AUX=0<br>またはUART有?"}
+  G -->|Yes| H["LoRa受信処理"]
+  H --> I{"DATA受信?"}
+  I -->|Yes| J["★ ルートA処理<br>→GW報告フローへ"]
+  I -->|No| K{"MANUAL_RES受信?"}
+  L["CHUNK_QUEUE urgent投入"]
+  K -->|Yes| L
+  M{"should_sync?<br>30分毎"}
+  K -->|No| M
+  J --> M
+  L --> M
+  M -->|Yes| N["BATCH_CACHE→<br>CHUNK_QUEUE"]
+  O{"Scheduler1<br>25-30秒スロット"}
+  M -->|No| O
+  N --> O
+  O -->|Yes| P{"PENDING_SYNC?"}
+  P -->|Yes| Q["sync_fields GET"]
+  P -->|No| R{"CHUNK_QUEUE<br>空でない?"}
+  R -->|Yes| S["https_post_json_to_gas<br>FIELD_CACHE更新<br>LORA_CMD_QUEUE更新"]
+  T{"Scheduler2<br>35-40秒スロット<br>ルートB"}
+  R -->|No| T
+  Q --> T
+  S --> T
+  O -->|No| T
+  T -->|Yes| U["★ WAKEUP→1500ms<br>→NORMAL→1500ms<br>→MANUAL送信<br>★ log_event 202/205"]
+  T -->|No| V["sleep_ms 50<br>gc.collect"]
+  U --> V
+  V --> A
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>③ DATA受信処理＋ルートA詳細</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["DATA受信"]) --> B["AUX HIGH待ち<br>sleep_ms 20<br>★ バッファ蓄積:\n到達まで_gw_bufに蓄積(200msタイムアウト)<br>DATA≈100バイト 部分読み取り防止"]
+  B --> C{"DATA 含む?"}
+  Z(["戻る"])
+  C -->|No| Z
+  C -->|Yes| D["field_id volt level<br>act_st sys_st抽出"]
+  E{"urgent判定<br>op_status異常?<br>sys_st異常?<br>act_st異常?<br>SUCCESS OPEN CLOSE?"}
+  D --> E
+  E -->|urgent| F["CHUNK_QUEUE先頭挿入"]
+  E -->|normal| G["BATCH_CACHE上書き"]
+  H["g_res=FIELD_CACHE取得<br>tg_ch=FIELD_CHANNELS取得"]
+  F --> H
+  G --> H
+  H --> H2["★ _time_has_stop判定<br>g_res末尾がSTOP?"]
+  H2 --> I["★ sleep_ms 1200(TIME送信前待機)<br>★ set_mode_normal<br>send_lora TIME(プリアンブルなし)<br>★ log_event 208(STOP) または 207(RUN)<br>set_mode_wor_rx<br>(センサーノードNORMAL確立T=1310ms<br>TIME到達T=1490ms 余裕180ms)"]
+  J{"LORA_CMD_QUEUE<br>空でない?<br>かつfield_id一致?"}
+  I --> J
+  J -->|No| Z
+  J -->|Yes| J2{"_time_has_stop?"}
+  J2 -->|Yes STOP| J3["★ 安全窓待機<br>sleep_ms 10000<br>アクチュエーターlightsleep確認後送信"]
+  J2 -->|No RUN| J4["E220安定待機<br>sleep_ms 500"]
+  K["★ ルートA<br>set_mode_wor_tx<br>send_lora WAKEUP<br>sleep 1500ms<br>set_mode_normal<br>sleep 1500ms<br>send_lora MANUAL<br>★ 同一ch:NORMALモード維持<br>異なるch:set_lora_ch(LISTEN_CH)"]
+  J3 --> K
+  J4 --> K
+  K --> L["★ log_event 202(OPEN) または 205(CLOSE)<br>save_lora_cmd_queue"]
+  L --> M{"QUEUE空?"}
+  M -->|Yes| N["manual_cmd_deadline=None"]
+  O(["そのまま"])
+  M -->|No| O
+  N --> Z
+  O --> Z
+
+  Z2(["MANUAL_RES受信後"])
+  Z2 --> ZR["★ set_mode_wor_rx<br>CHUNK_QUEUE urgent投入"]
+  ZR --> Z
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-gw_lte" class="panel">
+  <div class="panel-header">
+    <h2>📶 ゲートウェイ (LTE版 無印Pico / 48MHz)</h2>
+    <p>SIM7080G LTE制御 / APN接続 / LoRa WOR RX常時待機 / ルートA(STOP安全窓10秒/RUN 500ms分岐) / イベントコード分離 / TIME送信はNORMAL(1200ms後) / MANUAL送信後NORMAL維持→MANUAL_RES受信後WOR RX</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① 起動フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["起動"]) --> B["machine.freq 48MHz<br>UART0 UART1初期化<br>rxbuf 4096"]
+  B --> C["load_config<br>load_lora_cmd_queue"]
+  C --> D["startup_led_pattern"]
+  D --> E["sim_power_on<br>LTEモジュール電源ON"]
+  E --> F["sim_wait_ready<br>AT応答待ち最大20秒"]
+  F --> G["lte_connect<br>APN設定→PDP→HTTP初期化"]
+  G --> H{"LTE接続成功?"}
+  H -->|No| I["log_event 103<br>リトライ"]
+  H -->|Yes| J["log_event 102<br>NTP時刻同期"]
+  J --> K["sync_fields GET<br>FIELD_CHANNELS取得"]
+  K --> L["initialize_e220_startup<br>set_lora_ch → WOR RX"]
+  L --> M["GWブート通知<br>CHUNK_QUEUEに積む"]
+  M --> N{"LORA_CMD_QUEUE<br>空でない?"}
+  N -->|Yes| O["manual_cmd_deadline<br>now+35分"]
+  P(["メインループへ"])
+  N -->|No| P
+  O --> P
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② LTE通信フロー詳細</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["https_post_json_to_gas"]) --> B["sim_wakeup<br>AT確認"]
+  B --> C{"応答あり?"}
+  C -->|No| D["sim_power_on<br>再起動シーケンス"]
+  D --> E["lte_connect"]
+  C -->|Yes| F["AT+SHBOD データ設定"]
+  F --> G["AT+SHREQ POST送信<br>最大30秒"]
+  G --> H{"HTTP 200?"}
+  I["log_event 105<br>return None"]
+  H -->|No| I
+  H -->|Yes| J["AT+SHREAD<br>レスポンス読み出し"]
+  J --> K{"JSON正常?"}
+  K -->|No| I
+  K -->|Yes| L["return レスポンス文字列"]
+  M(["呼び出し元へ"])
+  L --> M
+
+  A2(["lte_connect"]) --> B2["AT+CGDCONT APN設定"]
+  B2 --> C2["AT+CNACT PDP起動<br>最大60秒"]
+  C2 --> D2{"ACTIVE?"}
+  D2 -->|No| E2["log_event 103<br>return False"]
+  D2 -->|Yes| F2["AT+SHCONF HTTP設定"]
+  F2 --> G2["AT+SHCONN 接続<br>最大30秒"]
+  G2 --> H2["return True"]
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>③ メインループ全体構造</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["ループ開始"]) --> B["manage_charging<br>5秒毎"]
+  B --> C{"AUX=0<br>またはUART有?"}
+  C -->|Yes| D["LoRa受信処理<br>★ バッファ蓄積:\n到達まで_gw_bufに蓄積(200msタイムアウト)<br>DATA or MANUAL_RES"]
+  D --> E{"DATA受信?"}
+  E -->|Yes| F["★ sleep_ms 1200(TIME送信前待機)<br>★ set_mode_normal<br>send_lora TIME(プリアンブルなし)<br>★ log_event 208/207<br>★ ルートA判定<br>STOP:安全窓10秒 RUN:500ms待機<br>MANUAL送信後 同一ch:NORMAL維持<br>★ log_event 202/205"]
+  E -->|No| G{"MANUAL_RES?"}
+  G -->|Yes| H["CHUNK_QUEUE urgent投入<br>★ set_mode_wor_rx"]
+  I{"ルートC<br>manual_cmd_deadline<br>期限超過?"}
+  F --> I
+  H --> I
+  C -->|No| I
+  I -->|Yes| J["★ WAKEUP→1500ms<br>→NORMAL→1500ms<br>→MANUAL送信<br>log_event 206<br>★ log_event 202/205"]
+  K{"MAINT時刻?"}
+  I -->|No| K
+  J --> K
+  K -->|Yes| L["machine.reset"]
+  M{"should_sync?<br>30分毎"}
+  K -->|No| M
+  M -->|Yes| N["BATCH_CACHE→<br>CHUNK_QUEUE生成"]
+  O{"25-30秒スロット<br>かつCHUNK_QUEUE有?"}
+  M -->|No| O
+  N --> O
+  O -->|Yes| P["https_post_json_to_gas<br>FIELD_CACHE更新<br>LORA_CMD_QUEUE更新"]
+  Q{"35-40秒スロット<br>ルートB"}
+  O -->|No| Q
+  P --> Q
+  Q -->|Yes| R["★ WAKEUP→1500ms<br>→NORMAL→1500ms<br>→MANUAL送信<br>★ log_event 202/205"]
+  Q -->|No| S["gc.collect<br>sleep_ms 50"]
+  R --> S
+  S --> A
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-proxy" class="panel">
+  <div class="panel-header">
+    <h2>🌐 Cloudflare Worker プロキシサーバー</h2>
+    <p>GASの302リダイレクト自動追従・CORSヘッダ付与 (POSTボディ消滅回避)</p>
+  </div>
+  <div class="diagram-grid cols1">
+    <div class="diagram-box">
+      <h3>① リクエスト中継・CORS処理フロー</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["クライアント要求<br>fetch"]) --> B{"OPTIONSメソッド?<br>CORSプリフライト"}
+  B -->|Yes| C["CORSヘッダ設定<br>Access-Control-Allow-*"]
+  Z(["return Response(null)"])
+  C --> Z
+  B -->|No| D["GAS Web App URL構築<br>パラメータ引継ぎ"]
+  D --> E["requestInit構築<br>redirect: 'follow' 設定<br>GASの302リダイレクト追従"]
+  E --> F{"POSTメソッド?"}
+  F -->|Yes| G["リクエストボディ読込<br>request.arrayBuffer"]
+  F -->|No| H["fetch実行<br>中継先GASへ"]
+  G --> H
+  H --> I["レスポンス取得<br>CORSヘッダ再付与"]
+  J(["クライアントへ返却"])
+  I --> J
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-gas_main" class="panel">
+  <div class="panel-header">
+    <h2>☁️ 管理用バックエンドGAS</h2>
+    <p>データ受信・モード管理・Discord通知・ダッシュボード連携</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① doPost (一括データ受信・処理)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["doPost(e)"]) --> B["LockService.waitLock"]
+  B --> C{"ロック取得?"}
+  Z1(["return BUSY エラー"])
+  C -->|No| Z1
+  C -->|Yes| D["JSONパース<br>batchData"]
+  D --> E["SYSTEMシート確認<br>globalMode/notify取得"]
+  E --> F["各ノードのデータループ処理"]
+  F --> G["processNodeData呼出"]
+  G --> H{"異常・状態変化<br>あるか?"}
+  H -->|Yes| I["アラート配列に蓄積"]
+  H -->|No| J["次データへ"]
+  I --> J
+  J --> K{"全データ処理完了?"}
+  K -->|No| F
+  K -->|Yes| L{"bulkAlerts有?"}
+  L -->|Yes| M["Discordへ一括通知送信<br>sendMessagingApiPush"]
+  L -->|No| N["REMOTE_CMDシート確認<br>PENDINGコマンド抽出"]
+  M --> N
+  N --> O["ロック解放<br>finally処理"]
+  P(["return JSON<br>CONFIG / COMMANDS"])
+  O --> P
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② processNodeData (ノード個別ロジック)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["processNodeData"]) --> B["Log/ID_LISTシート検索"]
+  B --> C["前回値取得<br>フィールドモード(RUN/STOP)判定"]
+  C --> D{"rawGate == 'KEEP'<br>または空文字?"}
+  D -->|Yes| E["表示用finalGateに<br>前回ステータスを補完"]
+  D -->|No| F["受信データを採用"]
+  E --> F
+  F --> G{"アラート判定条件"}
+  G -->|アクチュエーター開閉変化| H["Discord通知キュー追加"]
+  G -->|センサー/動作エラー| H
+  G -->|通信失敗・タイムアウト| H
+  G -->|電圧・バッテリー低下| H
+  G -->|該当なし| I["Logシート更新<br>上書きまたは追記"]
+  H --> I
+  I --> J["DASHBOARD用SSへ履歴追記<br>イベントコード(e_log)付与"]
+  J --> K["最終通信時刻更新<br>updateLastActiveTime"]
+  L(["return<br>閾値とモード(RUN/STOP)"])
+  K --> L
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>③ 定期実行 (トリガー監視)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["1時間毎トリガー<br>monitorCommunicationHeartbeat"]) --> B["SYSTEMシート確認<br>RUNモード時のみ実行"]
+  B --> C["ID_LIST走査"]
+  C --> D{"最終通信から<br>90分以上経過?"}
+  D -->|No| E["次ノードへ"]
+  D -->|Yes| F{"現在OFFLINE?"}
+  F -->|Yes| E
+  F -->|No| G["Discordへ通信途絶アラート送信"]
+  G --> H["状態をOFFLINEに変更<br>LogシートにTIMEOUT行追記"]
+  H --> E
+  E --> I{"走査完了?"}
+  I -->|No| C
+  J(["終了"])
+  I -->|Yes| J
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-dash_main" class="panel">
+  <div class="panel-header">
+    <h2>💻 メインダッシュボード (index.html)</h2>
+    <p>フロントエンドUI・Cloudflareプロキシ連携・USBシリアル設定・遠隔操作</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① データ読み込み・描画 (loadData)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["loadData()開始"]) --> B["UI: ローディング表示"]
+  B --> C["callGasApi<br>action=getDataForWeb"]
+  C --> D["Cloudflare Worker経由で<br>GASからJSON取得"]
+  D --> E{"取得成功?"}
+  E -->|No| F["UI: エラー詳細表示<br>デプロイURL確認喚起"]
+  E -->|Yes| G["renderData(data)"]
+  G --> H["システム設定反映<br>RUN/STOP一括切替ボタン"]
+  H --> I["Logデータループ<br>カードUI生成"]
+  I --> J["個別モード/全体モード考慮<br>フィールド状況・電圧描画"]
+  J --> K["履歴タブ・グラフ描画<br>Chart.js更新"]
+  L(["描画完了"])
+  K --> L
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② 遠隔操作予約 (sendRemoteCommand)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["sendRemoteCommand<br>ボタンクリック"]) --> B{"fieldMode == 'STOP'?"}
+  B -->|No| C["警告アラート表示<br>『RUN中は操作不可』<br>処理中断"]
+  B -->|Yes| D["確認ダイアログ表示"]
+  D -->|Cancel| Z(["中断"])
+  D -->|OK| E["UI: 処理中オーバーレイ"]
+  E --> F["callGasApi<br>action=sendRemoteCmd"]
+  F --> G{"GAS登録成功?"}
+  G -->|Yes| H["完了アラート表示"]
+  G -->|No| I["エラーアラート表示"]
+  H --> J(["オーバーレイ非表示"])
+  I --> J
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-gas_hist" class="panel">
+  <div class="panel-header">
+    <h2>📊 管理履歴閲覧 (GAS / スマホ対応HTML)</h2>
+    <p>履歴データ供給・自動アーカイブ処理・イベントログ翻訳</p>
+  </div>
+  <div class="diagram-grid cols2">
+    <div class="diagram-box">
+      <h3>① History取得 (GAS側・UI連携)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["GAS: doGet(e)"]) --> B["HTMLテンプレート<br>(スマホ対応版)返却"]
+  B --> C(["UI: ブラウザ読込<br>loadData()実行"])
+  C --> D["google.script.run<br>getDataForWeb()呼出"]
+  D --> E["GAS: Historyシート検索<br>直近4500行取得"]
+  E --> F["最新状態マップ作成<br>logData生成"]
+  F --> G["JSONとしてUIへ返却"]
+  G --> H["UI: renderData()"]
+  H --> I["カードUI生成<br>履歴リスト生成"]
+  I --> J["Chart.js グラフ生成<br>開/閉イベントにマーカー付与"]
+  K(["描画完了"])
+  J --> K
+      </div>
+    </div>
+
+    <div class="diagram-box">
+      <h3>② 保守機能 (自動アーカイブ / イベント翻訳)</h3>
+      <div class="mermaid">
+flowchart TD
+  A(["深夜2時トリガー<br>archiveHistorySheet"]) --> B["Historyシート<br>最終行数確認"]
+  B --> C{"行数 > 50000?"}
+  C -->|No| Z(["終了"])
+  C -->|Yes| D["既存シート走査<br>CopiedHistory-(X) の<br>最大インデックス検索"]
+  D --> E["シート複製・リネーム退避"]
+  E --> F["元のHistoryシートの<br>データ範囲クリア(1行目残す)"]
+  F --> Z
+
+  A2(["カスタム関数<br>GET_EVENT_LOG"]) --> B2["対象IDでHistory検索"]
+  B2 --> C2["P列(e_log)カンマ分割"]
+  C2 --> D2["EVENT_DICT辞書参照<br>101→LTE初期化<br>202→MANUAL送信など"]
+  D2 --> E2["翻訳後文字列と日時を<br>配列として返却"]
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#dbeafe',
+    primaryTextColor: '#1e3a5f',
+    primaryBorderColor: '#3b82f6',
+    lineColor: '#4b5563',
+    secondaryColor: '#fef3c7',
+    tertiaryColor: '#f0fdf4',
+    background: '#ffffff',
+    mainBkg: '#eff6ff',
+    nodeBorder: '#3b82f6',
+    clusterBkg: '#f8fafc',
+    titleColor: '#1e3a5f',
+    edgeLabelBackground: '#f9fafb',
+    fontSize: '13px'
+  },
+  flowchart: { curve: 'linear', padding: 15 }
+});
+
+function show(event, id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>

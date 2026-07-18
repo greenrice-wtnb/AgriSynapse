@@ -1,0 +1,57 @@
+/*
+ * Copyright (C) 2026 AgriSynapse Project
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+export default {
+  async fetch(request) {
+    // ★ デプロイ済みの管理用GASのウェブアプリURLをここに入力してください
+    const GAS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
+
+    // CORSプリフライト要求への対応
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        }
+      });
+    }
+
+    const url = new URL(request.url);
+    const targetUrl = new URL(GAS_URL);
+    targetUrl.search = url.search;
+
+    const requestInit = {
+      method: request.method,
+      redirect: "follow", // ★ GASの302リダイレクトをここで自動追従！
+      headers: {}
+    };
+
+    const contentType = request.headers.get("Content-Type");
+    if (contentType) {
+      requestInit.headers["Content-Type"] = contentType;
+    }
+
+    if (request.method === "POST") {
+      requestInit.body = await request.arrayBuffer();
+    }
+
+    // GASへ通信を中継
+    const response = await fetch(targetUrl.toString(), requestInit);
+    
+    // GASからの純粋なJSON応答にCORSヘッダーを付けて返す
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.set("Access-Control-Allow-Origin", "*");
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: responseHeaders
+    });
+  }
+};

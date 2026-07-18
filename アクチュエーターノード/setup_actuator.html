@@ -1,0 +1,276 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>アクチュエーターノード 設定</title>
+<style>
+  :root { --primary: #2E7D32; --bg: #f0f4f0; --card: #ffffff; --danger: #c62828; --success: #2E7D32; --warn: #f57f17; --open-color: #1565C0; --close-color: #c62828; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; background: var(--bg); color: #333; margin: 0; padding: 0; padding-bottom: 40px; }
+  header { background: var(--primary); color: white; padding: 14px 16px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); position: sticky; top: 0; z-index: 100; }
+  header h1 { margin: 0; font-size: 1.1rem; }
+  header p  { margin: 4px 0 0; font-size: 0.75rem; opacity: 0.85; }
+  .card { background: var(--card); border-radius: 10px; padding: 16px; margin: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  h2 { margin: 0 0 12px; font-size: 0.95rem; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
+  label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin-bottom: 12px; }
+  label span { font-weight: normal; color: #888; font-size: 0.75rem; margin-left: 4px; }
+  input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; margin-top: 4px; background: white; }
+  .status-box { background: #e8f5e9; border-left: 4px solid var(--success); border-radius: 6px; padding: 10px 12px; font-size: 0.85rem; margin-bottom: 10px; }
+  .status-box .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .status-box .value { font-weight: bold; color: #1b5e20; }
+  #gate-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+  .badge-open { background: #bbdefb; color: #0d47a1; }
+  .badge-close { background: #ffcdd2; color: #b71c1c; }
+  .badge-unknown { background: #f5f5f5; color: #757575; }
+  .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; color: white; margin-bottom: 10px; transition: opacity 0.15s; }
+  .btn:active { opacity: 0.75; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-save { background: var(--success); }
+  .btn-open { background: var(--open-color); }
+  .btn-close { background: var(--close-color); }
+  .gate-ctrl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .result-box { display: none; padding: 12px; border-radius: 8px; font-size: 0.85rem; margin: 8px 0; text-align: center; }
+  .result-ok { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+  .result-err { background: #ffebee; color: #b71c1c; border: 1px solid #ef9a9a; }
+  .result-loading { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+  .result-warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  #timeout-bar-wrap { background: #e0e0e0; border-radius: 4px; height: 6px; margin: 10px 0 4px; overflow: hidden; }
+  #timeout-bar { height: 100%; background: var(--warn); transition: width 1s linear; }
+  #timeout-text { font-size: 0.75rem; color: #777; text-align: right; }
+  .warn-note { background: #fff8e1; border-left: 4px solid var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 0.8rem; color: #5d4037; margin-bottom: 14px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="max-width: 220px; margin: 0 auto 8px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>アクチュエーターノード 現地設定</h1>
+  <p>PicoW APモード設定 — <strong>192.168.4.1</strong></p>
+</header>
+
+<div class="card">
+  <h2>📊 現在のノード状態</h2>
+  <div class="status-box">
+    <div class="row"><span>ノードID</span><span class="value" id="disp-id">__FIELD_ID__</span></div>
+    <div class="row"><span>水門状態</span><span class="value"><span id="gate-badge">__GATE_STATUS__</span></span></div>
+    <div class="row"><span>12V バッテリー</span><span class="value" id="disp-v12">__V12__ V</span></div>
+    <div class="row"><span>VSYS電圧</span><span class="value" id="disp-vsys">__VSYS__ V</span></div>
+  </div>
+  <div id="timeout-bar-wrap"><div id="timeout-bar" style="width:100%;"></div></div>
+  <div id="timeout-text">自動移行まで: 180秒</div>
+</div>
+
+<div class="card">
+  <h2>🔧 リモコン操作</h2>
+  <div class="warn-note">💡 操作後、ネット復帰時にクラウドへ状態を自動同期します。</div>
+  <div class="gate-ctrl-row">
+    <button class="btn btn-open" onclick="doGateOp('open')" id="btn-open">🟢 開ける (OPEN)</button>
+    <button class="btn btn-close" onclick="doGateOp('close')" id="btn-close">🔴 閉める (CLOSE)</button>
+  </div>
+  <div id="gate-result" class="result-box"></div>
+</div>
+
+<div class="card">
+  <h2>⚙️ 動作設定</h2>
+  <form id="config-form">
+    <label>ノードID <span>半角英数・ハイフンのみ</span>
+      <input type="text" name="id" id="f-id" value="__FIELD_ID__" pattern="[A-Za-z0-9_\-]+" required>
+    </label>
+    <label>AUTH_KEY <span>グループ認証キー</span>
+      <input type="text" name="auth" id="f-auth" value="__AUTH_KEY__" required>
+    </label>
+    <label>LoRa CH <span>0〜14 / GWと同じ値</span>
+      <input type="number" name="ch" id="f-ch" value="__MY_CH__" min="0" max="14" required>
+    </label>
+    
+    <label>リレー開CH <span>1 または 2 / 配線に合わせて設定</span>
+      <select name="relay_ch" id="f-relay-ch">
+        <option value="1" id="opt-relay1">CH1でOPEN (標準)</option>
+        <option value="2" id="opt-relay2">CH2でOPEN (逆配線)</option>
+      </select>
+    </label>
+
+    <label>稼働モード
+      <select name="mode" id="f-mode">
+        <option value="RUN" id="opt-run">RUN（自動稼働）</option>
+        <option value="STOP" id="opt-stop">STOP（停止）</option>
+      </select>
+    </label>
+    <button type="submit" class="btn btn-save" id="btn-save">💾 設定を保存してクラウド同期</button>
+  </form>
+</div>
+
+<script>
+// ★ ここに、CloudflareWorkersにデプロイした「管理用GASの302リダイレクト追従用プロキシサーバーJavaScript」のURLを入力してください↓
+  const GAS_PROXY_URL = "https://gas-proxy.XXXXXXXXXX.workers.dev/";
+  const badge = document.getElementById('gate-badge');
+  
+  // 初期バッジ色設定
+  const initGate = "__GATE_STATUS__";
+  badge.className = initGate === 'OPEN' ? 'badge-open' : initGate === 'CLOSE' ? 'badge-close' : 'badge-unknown';
+
+  if ("__MODE__" === "STOP") document.getElementById('opt-stop').selected = true;
+  else                       document.getElementById('opt-run').selected = true;
+
+  // ★ リレー設定の初期値反映
+  const currentRelayCh = "__RELAY_OPEN_CH__";
+  if (currentRelayCh === "2") document.getElementById('opt-relay2').selected = true;
+  else                        document.getElementById('opt-relay1').selected = true;
+
+  // インターネット復帰待ち関数
+  async function waitForInternet() {
+    let isOnline = false;
+    while (!isOnline) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        await fetch('https://www.google.com/favicon.ico', { mode: 'no-cors', cache: 'no-cache' });
+        isOnline = true;
+      } catch (err) { /* offline */ }
+    }
+    return true;
+  }
+
+  // 1. 設定保存時の同期
+  document.getElementById('config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save');
+    btn.innerHTML = '<span class="spinner"></span>Picoに保存中...';
+    btn.disabled = true;
+
+    const fd = new FormData(this);
+    const fid = document.getElementById('f-id').value;
+    const mode = document.getElementById('f-mode').value;
+
+    try {
+      await fetch('/save', { method: 'POST', body: new URLSearchParams(fd) });
+      showGateResult('保存完了！<br>ネット復帰を待ってクラウドへ同期します...', 'result-warn');
+
+      await waitForInternet();
+      showGateResult('クラウドへ設定を同期中...', 'result-loading');
+      
+      // Gateノード用の同期（FieldConfigCmd）
+      const gasUrl = `${GAS_PROXY_URL}?action=saveFieldConfigCmd&id=${encodeURIComponent(fid)}&mode=${mode}`;
+      await fetch(gasUrl);
+      
+      showGateResult('✅ すべての同期が完了しました！再起動します...', 'result-ok');
+      setTimeout(() => location.reload(), 2000);
+    } catch (err) {
+      showGateResult('❌ クラウド同期に失敗しました。', 'result-err');
+      btn.disabled = false;
+    }
+  });
+
+  // 2. リモコン操作時の同期
+  async function doGateOp(cmd) {
+    const btnOpen = document.getElementById('btn-open');
+    const btnClose = document.getElementById('btn-close');
+    const fid = document.getElementById('f-id').value;
+    btnOpen.disabled = true; btnClose.disabled = true;
+
+    showGateResult('<span class="spinner" style="border-top-color:#0d47a1;"></span>水門動作中...', 'result-loading');
+
+    try {
+      const res = await fetch('/' + cmd, { method: 'POST' });
+      const txt = await res.text();
+      
+      // 画面上の表示を先行更新
+      const newStatus = cmd === 'open' ? 'OPEN' : 'CLOSE';
+      badge.textContent = newStatus;
+      badge.className = cmd === 'open' ? 'badge-open' : 'badge-close';
+      
+      const v12m = txt.match(/12V:([\d.]+)/);
+      const v12 = v12m ? v12m[1] : "0.00";
+      if (v12m) document.getElementById('disp-v12').textContent = v12 + ' V';
+
+      showGateResult('現地操作成功！<br>ネット復帰後にクラウドへ反映します...', 'result-warn');
+
+      // ネット復帰を待ってGASのManualLogを叩く
+      await waitForInternet();
+      showGateResult('クラウドへ開閉状態を反映中...', 'result-loading');
+
+      const gasUrl = `${GAS_PROXY_URL}?action=saveManualLogCmd&id=${encodeURIComponent(fid)}&opCmd=${newStatus}&status=SUCCESS&gate_12v=${v12}&act_st=NORMAL`;
+      await fetch(gasUrl);
+
+      showGateResult('✅ クラウドへの状態反映が完了しました！', 'result-ok');
+    } catch (err) {
+      showGateResult('❌ 操作または同期に失敗しました。', 'result-err');
+    } finally {
+      btnOpen.disabled = false; btnClose.disabled = false;
+    }
+  }
+
+  function showGateResult(msg, className) {
+    const el = document.getElementById('gate-result');
+    el.innerHTML = msg;
+    el.className = 'result-box ' + className;
+    el.style.display = 'block';
+  }
+
+  // タイムアウトカウントダウン
+  let rem = 180;
+  const bar = document.getElementById('timeout-bar');
+  const txt = document.getElementById('timeout-text');
+  setInterval(() => {
+    if(rem > 0) {
+      rem--;
+      const pct = (rem/180)*100;
+      bar.style.width = pct+'%';
+      txt.textContent = `自動移行まで: ${rem}秒`;
+    }
+  }, 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,1291 @@
+<!--
+Copyright (C) 2026 AgriSynapse Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理ダッシュボード</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --primary: #2E7D32; --bg: #f4f7f6; --card-bg: #ffffff; --text: #333; --danger: #c62828; --warning: #f9a825; --off-color: #9e9e9e; --info: #2196F3; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 80px; }
+    header { background-color: var(--primary); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    h1 { margin: 0; font-size: 1.2rem; }
+    .sys-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .sys-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; }
+    .sys-btn.mode-stop { background: #c62828; border-color: #ff8a80; }
+    .tabs { display: flex; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 68px; z-index: 999; }
+    .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-weight: bold; color: #666; font-size: 0.9rem; }
+    .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: #e0f2f1; }
+    .content { padding: 15px; display: none; }
+    .content.active { display: block; }
+    .card { background: var(--card-bg); border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; border-left: 5px solid #ddd; }
+    .card.status-NORMAL { border-left-color: var(--primary); }
+    .card.status-ERROR, .card.status-ACT_ERR { border-left-color: var(--danger); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .field-id { font-size: 1.1rem; font-weight: bold; }
+    .timestamp { font-size: 0.8rem; color: #888; }
+    .field-mode-btn { font-size: 0.75rem; padding: 3px 10px; border-radius: 15px; cursor: pointer; border: none; font-weight: bold; color: white; margin-left: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .field-mode-RUN { background: var(--primary); }
+    .field-mode-STOP { background: var(--danger); }
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem; }
+    .data-item { background: #f9f9f9; padding: 8px; border-radius: 5px; }
+    .label { display: block; font-size: 0.7rem; color: #666; margin-bottom: 2px; }
+    .value { font-weight: bold; font-size: 1.0rem; display: flex; align-items: center; }
+    .remote-ctrl-row { display: flex; gap: 10px; margin-top: 5px; }
+    .btn-remote { flex: 1; padding: 10px; border: none; border-radius: 5px; font-weight: bold; color: white; cursor: pointer; font-size: 0.85rem; }
+    .btn-remote.open { background-color: #2E7D32; } .btn-remote.close { background-color: #C62828; }
+    .history-item { background: white; padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .hist-time { font-size: 0.8rem; color: #666; }
+    .hist-id { font-weight: bold; font-size: 0.9rem; }
+    .hist-action { font-size: 0.9rem; padding: 3px 8px; border-radius: 4px; background: #eee; }
+    .act-OPEN { background: #E8F5E9; color: #2E7D32; }
+    .act-CLOSE { background: #FFEBEE; color: #C62828; }
+    .graph-controls { margin-bottom: 15px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    select { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #ddd; border-radius: 5px; background: white; }
+    .chart-container { position: relative; height: 350px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .legend-custom { text-align: center; font-size: 0.8rem; color: #666; margin-top: 5px; }
+    .legend-item { display: inline-block; margin: 0 5px; }
+    .dot { display: inline-block; width: 10px; height: 10px; margin-right: 3px; }
+    .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 420px; border-radius: 10px; }
+    .modal-content input, .modal-content select { width: calc(100% - 20px); padding: 8px; margin-top: 5px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; }
+    .modal-content input[disabled] { background: #eee; color: #555; font-weight: bold; }
+    .modal-btn { padding: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.9rem; margin-bottom: 5px; width: 100%; color: white; }
+    .btn-save { background-color: #2196F3; }
+    .btn-usb { background-color: #9C27B0; }
+    .btn-download { background-color: #4CAF50; }
+    .btn-close { background-color: #9e9e9e; }
+    .group-box { background: #f4f7f6; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid var(--info); }
+    .ch-override-label { font-size: 0.85rem; font-weight: bold; color: #1565C0; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; cursor: pointer; }
+    .ch-override-label input[type=checkbox] { width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
+    #loading { text-align: center; padding: 20px; color: #666; }
+    #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); display:none; z-index:2000; justify-content:center; align-items:center; flex-direction:column; font-weight:bold; color:var(--primary); }
+    .fab { position: fixed; bottom: 20px; right: 20px; background: var(--primary); color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); font-size: 24px; z-index: 1001; cursor: pointer;}
+  </style>
+</head>
+<body>
+
+<div id="overlay"><div id="overlay-text">処理中...</div></div>
+
+<header>
+  <div style="max-width: 250px; margin: 0 auto 10px auto;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" width="100%" height="auto">
+      <defs>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+        <linearGradient id="underlineGrad" x1="0%" y1="0%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#34C759" />
+          <stop offset="100%" stop-color="#007AFF" />
+        </linearGradient>
+      </defs>
+      <line x1="80" y1="15" x2="80" y2="155" stroke="url(#lineGrad)" stroke-width="6" stroke-linecap="round" />
+      <g stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round">
+        <line x1="80" y1="15" x2="35" y2="70" />
+        <line x1="35" y1="70" x2="55" y2="120" />
+        <line x1="55" y1="120" x2="80" y2="145" />
+        <line x1="80" y1="145" x2="105" y2="120" />
+        <line x1="105" y1="120" x2="125" y2="70" />
+        <line x1="125" y1="70" x2="80" y2="15" />
+        <line x1="35" y1="70" x2="80" y2="85" />
+        <line x1="55" y1="120" x2="80" y2="85" />
+        <line x1="125" y1="70" x2="80" y2="85" />
+        <line x1="105" y1="120" x2="80" y2="85" />
+      </g>
+      <g fill="#ffffff" stroke="url(#lineGrad)" stroke-width="3">
+        <circle cx="80" cy="15" r="6" />
+        <circle cx="35" cy="70" r="6" />
+        <circle cx="55" cy="120" r="6" />
+        <circle cx="80" cy="145" r="6" />
+        <circle cx="105" cy="120" r="6" />
+        <circle cx="125" cy="70" r="6" />
+        <circle cx="80" cy="85" r="9" stroke-width="4" />
+      </g>
+      <circle cx="80" cy="85" r="3" fill="#007AFF" />
+      <text x="160" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1">
+        <tspan fill="#34C759">Agri</tspan><tspan fill="#ffffff">Synapse</tspan>
+      </text>
+      <line x1="162" y1="112" x2="490" y2="112" stroke="url(#underlineGrad)" stroke-width="5" stroke-linecap="round" />
+      <text x="165" y="136" font-family="'Courier New', Courier, monospace" font-size="14" font-weight="bold" fill="#ffffff" letter-spacing="3">AUTONOMOUS FIELD NETWORK</text>
+    </svg>
+  </div>
+  <h1>AgriSynapseダッシュボード</h1>
+  <div class="sys-controls">
+    <div id="btn-mode" class="sys-btn" onclick="toggleSystemMode()">読み込み中...</div>
+    <div id="btn-notify" class="sys-btn" onclick="toggleMasterNotify()">読み込み中...</div>
+  </div>
+  <div class="sys-controls" style="margin-top: 10px;">
+    <button id="btn-gw-status" class="sys-btn" style="background-color: #1976D2; font-weight: bold; padding: 6px 15px; display: none;" onclick="openGwStatusModal()">📶 GW稼働状況</button>
+    <button class="sys-btn" style="background-color: #9C27B0; font-weight: bold; padding: 6px 15px;" onclick="openGwModal()">⚙️ GW / グループ設定 (USB)</button>
+    <button class="sys-btn" style="background-color: #00796B; font-weight: bold; padding: 6px 15px;" onclick="window.open('algorithm.html', '_blank')">🗺️ アルゴリズム図</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('dashboard')">現在状況</div>
+  <div class="tab" onclick="switchTab('history')">操作履歴</div>
+  <div class="tab" onclick="switchTab('graph')">グラフ</div>
+</div>
+
+<div id="loading">データ取得中...</div>
+
+<div id="dashboard" class="content active">
+  <div id="cards-container"></div>
+</div>
+
+<div id="history" class="content">
+  <div class="graph-controls">
+    <div style="flex: 1; min-width: 150px;">
+      <label for="historyFieldSelect" class="label">表示する圃場IDを選択:</label>
+      <select id="historyFieldSelect" onchange="onHistoryIdChange()">
+        <option value="">-- 圃場IDを選択してください --</option>
+      </select>
+    </div>
+  </div>
+  <div id="history-container"></div>
+</div>
+
+<div id="graph" class="content">
+  <div class="graph-controls">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 150px;">
+        <label for="fieldSelect" class="label">表示する圃場ID:</label>
+        <select id="fieldSelect" onchange="onChartIdChange()"></select>
+      </div>
+      <div style="flex: 1; min-width: 150px;">
+        <label for="intervalSelect" class="label">グラフの表示間隔:</label>
+        <select id="intervalSelect" onchange="updateChart()">
+          <option value="0">すべて表示 (定時通信ごと)</option>
+          <option value="60">1時間ごと</option>
+          <option value="180">3時間ごと</option>
+          <option value="360">6時間ごと</option>
+          <option value="720">12時間ごと</option>
+          <option value="1440">1日ごと</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="chart-container">
+    <canvas id="myChart"></canvas>
+  </div>
+  <div class="legend-custom">
+    <span class="legend-item"><span class="dot" style="background:#2E7D32; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></span>開動作</span>
+    <span class="legend-item"><span class="dot" style="background:#C62828;"></span>閉動作</span>
+  </div>
+</div>
+
+<div id="gwStatusModal" class="modal">
+  <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+    <h3 style="margin-top:0; margin-bottom: 15px; color: #1976D2;">📶 ゲートウェイ稼働状況</h3>
+    <div id="gw-status-content"></div>
+    <div style="margin-top: 15px;">
+      <button class="modal-btn btn-close" onclick="closeGwStatusModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div id="configModal" class="modal">
+  <div class="modal-content">
+    <h3 style="margin-top:0;">⚙️ <span id="cfg-id-disp">ノード設定</span></h3>
+    <div id="cfg-last-seen" style="font-size:0.78rem; color:#888; margin-bottom:10px; padding:5px 8px; background:#f4f4f4; border-radius:5px;">最終通信: ---</div>
+
+    <label style="font-weight: bold; color: var(--primary);">ノードID (半角英数・内部用):
+      <input type="text" id="cfg-id" placeholder="例: FIELD_A">
+    </label>
+    <label>ノード種別:
+      <select id="cfg-node-type" onchange="onNodeTypeChange()">
+        <option value="water">センサーノード</option>
+        <option value="gate">アクチュエーター関連ノード</option>
+        <option value="repeater">リピーターノード</option>
+      </select>
+    </label>
+
+    <div class="group-box">
+      <label>グループ (親機 / 認証グループ):
+        <select id="cfg-group" onchange="onGroupChange()"></select>
+      </label>
+      <label>AUTH_KEY (グループより自動継承):
+        <input type="text" id="cfg-auth" disabled>
+      </label>
+    </div>
+
+    <div id="cfg-water-fields">
+      <label>DRY閾値 (cm - アクチュエーター関連開): <input type="number" id="cfg-dry" step="0.1"></label>
+      <label>FULL閾値 (cm - アクチュエーター関連閉): <input type="number" id="cfg-full" step="0.1"></label>
+    </div>
+    <div id="cfg-offset-field">
+      <label>送信オフセット (分): <input type="number" id="cfg-offset"></label>
+    </div>
+
+    <div id="cfg-ch-field">
+      <label>LoRa 送信(TX) CH (0-14):
+        <input type="number" id="cfg-ch" min="0" max="14" disabled>
+      </label>
+      <div id="cfg-ch-override-container">
+        <label class="ch-override-label">
+          <input type="checkbox" id="cfg-ch-override" onchange="onChOverrideChange()">
+          ☑ リピーターを経由する（別CHで送信）
+        </label>
+      </div>
+    </div>
+
+    <div id="cfg-repeater-fields">
+      <label>LoRa 受信(RX) CH [リピーター用] (0-14): <input type="number" id="cfg-rx-ch" min="0" max="14"></label>
+      <p style="font-size:0.75rem; color:#666; margin-top:0;">※ ターゲット(TX)CHはグループのCHで固定されます。</p>
+    </div>
+
+    <label>稼働モード:
+      <select id="cfg-mode">
+        <option value="RUN">RUN (自動稼働)</option>
+        <option value="STOP">STOP (停止)</option>
+      </select>
+    </label>
+
+    <div style="margin-top: 15px;">
+      <div id="cfg-gas-save-btn">
+        <button class="modal-btn btn-save" onclick="saveConfigToGas()">☁️ 設定をクラウド(GAS)に保存</button>
+      </div>
+      <button class="modal-btn btn-usb" onclick="writeConfigToUsb()">🔌 USB経由でPicoへ書込</button>
+      <button class="modal-btn btn-download" onclick="downloadConfigJson()">💾 設定ファイル(.py)としてダウンロード</button>
+      <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+      <button class="modal-btn" style="background-color: #c62828;" onclick="deleteFieldId()">🗑️ この圃場IDを完全に削除する</button>
+      <button class="modal-btn btn-close" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div id="gwConfigModal" class="modal">
+  <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+    <h3 style="margin-top:0;">⚙️ ゲートウェイ / グループ設定</h3>
+    <p style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">※GWにOTGケーブルを接続してください。</p>
+
+    <label>編集するグループ:
+      <select id="gw-group-select" onchange="onGwGroupChange()">
+        <option value="_NEW_">-- 新規グループ作成 --</option>
+      </select>
+    </label>
+    <div id="gw-new-group-div">
+      <label>新規グループ名 (半角英数・記号):
+        <input type="text" id="gw-group-name" placeholder="例: GROUP_NORTH">
+      </label>
+    </div>
+
+    <label>グループ AUTH_KEY: <input type="text" id="gw-auth" value="KOKUFU_2026"></label>
+    <label>GW 待受 / グループ CH (0-14): <input type="number" id="gw-ch" value="0" min="0" max="14"></label>
+    <label>GW 固有ID:
+      <input type="text" id="gw-gw-id" placeholder="例: GW-GROUP-A1 (空欄で変更なし)" style="width:100%;">
+      <span style="font-size:0.75rem; color:#666;">※このGW本体を識別するIDです。グループ名とは別に設定できます。</span>
+    </label>
+
+    <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+    <h4 style="margin-top: 0; margin-bottom: 5px; color: var(--primary);">⏱ TDMA送信タイミング設定</h4>
+    <div class="config-item">
+      <label>GW送信オフセット (0〜29分):
+        <input type="number" id="gw-offset" min="0" max="29" value="0" style="width:80px;">
+        <span style="font-size:0.75rem; color:#666; display:block; margin-top:4px;">
+          ※複数GW運用時、送信タイミングが重ならないように設定します。<br>
+           GWは (15+オフセット)分 / (45+オフセット)分 にGASへ送信します。<br>
+           （例: GW1=0→15/45分送信、GW2=1→16/46分送信）
+        </span>
+      </label>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+    <h4 style="margin-top: 0; margin-bottom: 5px; color: var(--primary);">📡 LTEマルチキャリア設定 (GW専用)</h4>
+    <p style="font-size: 0.75rem; color: #666; margin-top: 0; margin-bottom: 10px;">
+      ※既存の設定を維持する場合は、APNを<strong>空欄</strong>にしてください。<br>
+      (1NCE標準APN: iot.1nce.net / 帯域: 1,8,18,19,26)
+    </p>
+    
+    <label>APN: <input type="text" id="gw-apn" placeholder="例: soracom.io (空欄で変更なし)"></label>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <label>ユーザー名: <input type="text" id="gw-apn-user" placeholder="空欄可"></label>
+      <label>パスワード: <input type="text" id="gw-apn-pass" placeholder="空欄可"></label>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <label>認証方式:
+        <select id="gw-auth-type">
+          <option value="0">なし (None)</option>
+          <option value="1">PAP</option>
+          <option value="2">CHAP</option>
+          <option value="3">PAP / CHAP</option>
+        </select>
+      </label>
+      <label>プロトコル (PDP):
+        <select id="gw-ip-type">
+          <option value="IP">IPv4 (標準)</option>
+          <option value="IPV6">IPv6</option>
+          <option value="IPV4V6">IPv4/IPv6 デュアル</option>
+        </select>
+      </label>
+    </div>
+    <label>LTE帯域 (Bands): <input type="text" id="gw-bands" placeholder="例: 1,8,18,19,26 (空欄で変更なし)"></label>
+
+    <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+    <h4 style="margin-top: 0; margin-bottom: 5px; color: var(--primary);">🌐 Wi-Fi設定 (Wi-Fi対応機用)</h4>
+    <p style="font-size: 0.75rem; color: #666; margin-top: 0; margin-bottom: 10px;">※変更しない場合は空欄のままにしてください。</p>
+    <label>SSID: <input type="text" id="gw-ssid" placeholder="Wi-Fiネットワーク名"></label>
+    <label>パスワード: <input type="text" id="gw-pass" placeholder="Wi-Fiパスワード"></label>
+
+    <div style="margin-top: 15px;">
+      <button class="modal-btn btn-usb" onclick="writeGwConfigToUsb()">🔌 GWへUSB書込 ＆ グループ保存</button>
+      <button class="modal-btn btn-close" onclick="closeGwModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="fab" onclick="loadData()">↻</div>
+
+<script>
+<!-- ★ここに、CloudflareWorkersにデプロイした「管理用GASの302リダイレクト追従用プロキシサーバーJavaScript」のURLを入力してください -->
+  const GAS_WEB_APP_URL = "https://gas-proxy.XXXXXXXXXXXXX.workers.dev/";
+
+  let configMap = {};
+  let lastSeenMap = {};
+  let groupMap = {};
+  let notifMap = {}; 
+  let rawHistory = [];
+  let lastLogData = [];
+  let myChart = null;
+  let usbPort = null;
+  let gwLogsMap = {};
+
+  window.onload = loadData;
+
+  let serialAPI = null;
+  async function getSerialAPI() {
+    if (serialAPI) return serialAPI;
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (!isAndroid && navigator.serial) {
+      serialAPI = navigator.serial;
+    } else {
+      try {
+        const module = await import('https://cdn.jsdelivr.net/npm/web-serial-polyfill@1.0.15/dist/serial.js');
+        serialAPI = module.serial;
+      } catch (e) {
+        alert("Android用モジュールの読み込みに失敗しました。電波状況を確認してください。");
+        throw e;
+      }
+    }
+    return serialAPI;
+  }
+
+  function showOverlay(text) {
+    document.getElementById('overlay-text').innerText = text;
+    document.getElementById('overlay').style.display = 'flex';
+  }
+  function hideOverlay() { document.getElementById('overlay').style.display = 'none'; }
+
+  async function callGasApi(action, payload = {}) {
+    if (action) payload.action = action;
+    const params = new URLSearchParams(payload).toString();
+    const isGet = action === 'getDataForWeb' || action === 'getLatestStatusAll'
+      || action === 'toggleFieldModeCmd'
+      || payload.get_id_list || payload.get_group_list || payload.get_wifi_list
+      || payload.check_cmd || (!action && Object.keys(payload).length === 0);
+
+    try {
+      let response;
+      if (!isGet) {
+        response = await fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params
+        });
+      } else {
+        response = await fetch(GAS_WEB_APP_URL + '?' + params);
+      }
+      const text = await response.text();
+      try { return JSON.parse(text); } catch { return text; }
+    } catch (e) {
+      console.error("API Error:", e);
+      throw e;
+    }
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+    if (tabId === 'graph' && myChart) myChart.resize();
+  }
+
+  function loadData() {
+    const loadingEl = document.getElementById('loading');
+    loadingEl.style.display = 'block';
+    loadingEl.innerHTML = 'データ取得中...';
+
+    callGasApi('getLatestStatusAll')
+      .then(data => renderData(data))
+      .catch(e => {
+        loadingEl.innerHTML = `
+          <div style="color:#c62828; font-weight:bold; font-size:1.2rem; margin-bottom:10px;">❌ データ取得エラー</div>
+          <div style="font-size:0.9rem; color:#333; margin-bottom:15px; word-break: break-all;">${e.message}</div>
+          <div style="font-size:0.85rem; color:#666; text-align:left; background:#fff; padding:15px; border-radius:8px; border:1px solid #ccc; display:inline-block;">
+            <b style="color:#2E7D32;">【解決のための確認事項】</b><br>
+            1. GASのエディタで<b>「新しいデプロイ」</b>を作成しましたか？<br>
+            2. 新しいデプロイのURLを、302リダイレクト追従用プロキシサーバーのJavascript内の <code>GAS_WEB_APP_URL</code> に正しく貼り付けましたか？また、当HTMLコード内に、プロキシサーバーのURLを正しく貼り付けましたか？
+          </div>`;
+      });
+  }
+
+  let _historyFetchController = null; 
+  function fetchHistory(targetId) {
+    if (!targetId) return;
+
+    document.getElementById('history-container').innerHTML =
+      '<div style="text-align:center; padding:20px; color:#888;">📡 履歴を取得中...</div>';
+
+    if (_historyFetchController) _historyFetchController.abort();
+    _historyFetchController = new AbortController();
+
+    callGasApi('getDataForWeb', { targetId })
+      .then(data => {
+        rawHistory = (data.history || []).filter(row => {
+          if (!row || !row[1]) return false;
+          return !String(row[1]).toUpperCase().includes("GW");
+        });
+        updateHistoryList();
+        updateChart(); 
+      })
+      .catch(e => {
+        if (e.name === 'AbortError') return;
+        document.getElementById('history-container').innerHTML =
+          '<div style="text-align:center; padding:20px; color:#c62828;">履歴の取得に失敗しました</div>';
+      });
+  }
+
+  function renderData(data) {
+    if (data.error) {
+      document.getElementById('loading').innerHTML = `<span style="color:red; font-weight:bold;">❌ サーバー処理エラー: ${data.error}</span>`;
+      return;
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    if (data.configMap) configMap = data.configMap;
+    if (data.groupMap) groupMap = data.groupMap;
+    if (data.notifications) notifMap = data.notifications; 
+
+    populateGroupSelects();
+
+    const btnMode = document.getElementById('btn-mode');
+    btnMode.textContent = `稼働: ${data.system.mode}`;
+    if (data.system.mode === 'STOP') { btnMode.classList.add('mode-stop'); } else { btnMode.classList.remove('mode-stop'); }
+    document.getElementById('btn-notify').textContent = `全体通知: ${data.system.notify}`;
+
+    const globalMode = data.system.mode || "RUN";
+
+    lastSeenMap = {};
+    if (data.log) { data.log.forEach(row => { if (row && row[1] && row[0]) { lastSeenMap[String(row[1]).trim()] = row[0]; } }); }
+
+    const cardsDiv = document.getElementById('cards-container');
+    cardsDiv.innerHTML = '';
+    gwLogsMap = {}; 
+    let gwFound = false;
+
+    if (data.log && data.log.length > 0) {
+      data.log.forEach(row => {
+        if (!row || row.length < 2 || !row[1]) return;
+        const id = String(row[1]).trim();
+        if (id === "") return;
+
+        if (id.toUpperCase().includes("GW")) {
+            gwLogsMap[id] = row; 
+            gwFound = true;
+            return; 
+        }
+
+        const isErr = (row[11] !== 'NORMAL' && row[11] !== 'HALT') || row[12] === 'ACT_ERR' || row[12] === 'COMM_LOST';
+        const statusClass = isErr ? 'status-ERROR' : 'status-NORMAL';
+        
+        const individualMode = (configMap[id] && configMap[id].mode) ? configMap[id].mode : "RUN";
+        const displayMode = (globalMode === "STOP") ? "STOP" : individualMode;
+
+        let dispName = id;
+        if (configMap[id] && configMap[id].disp) { dispName = configMap[id].disp; }
+
+        const ts = lastSeenMap[id];
+        const lastSeenText = ts ? new Date(ts).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'データなし';
+        const rssiVal = row[10];
+        const rssiText = rssiVal ? rssiVal + ' dBm' : '---';
+        const rssiStatus = rssiVal ? (Number(rssiVal) <= -101 ? '<span style="color:#c62828; font-size:0.8rem;">⚠️ 弱い</span>' : '<span style="color:#2E7D32; font-size:0.8rem;">✅ 良好</span>') : '';
+        const waterPicoV = Number(row[4]).toFixed(2);
+        const gatePicoV = Number(row[5]).toFixed(2);
+
+        const notif = notifMap[id] || { gate: "ON", alert: "ON", warn: "ON", comm: "ON" };
+        const isGateChecked = notif.gate !== "OFF" ? "checked" : "";
+        const isAlertChecked = notif.alert !== "OFF" ? "checked" : "";
+        const isWarnChecked = notif.warn !== "OFF" ? "checked" : "";
+        const isCommChecked = notif.comm !== "OFF" ? "checked" : "";
+
+        const isCommLost = row[12] === 'COMM_LOST';
+        const commAlertBadge = isCommLost ? `<span style="background:#c62828; color:white; padding:2px 6px; border-radius:4px; font-size:0.75rem; margin-left:10px;">⚠️ 通信途絶</span>` : '';
+
+        const html = `
+          <div class="card ${statusClass}">
+            <div class="card-header">
+              <div>
+                <span class="field-id">${dispName}</span> <span style="font-size:0.7rem; color:#888;">(${id})</span>
+                <button class="field-mode-btn field-mode-${displayMode}" onclick="toggleFieldMode('${id}', '${individualMode}', '${globalMode}')">${displayMode}</button>
+                ${commAlertBadge}
+                <div class="timestamp" style="margin-top: 4px;">⏱ 最終通信: ${lastSeenText}</div>
+              </div>
+              <button onclick="openModal('${id}')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;">⚙️</button>
+            </div>
+            <div class="data-grid">
+              <div class="data-item"><span class="label">センサー計測値</span><div class="value">${Number(row[2]).toFixed(2)}cm</div></div>
+              <div class="data-item"><span class="label">センサーノード電源電圧</span><div class="value">${waterPicoV}V</div></div>
+              <div class="data-item">
+		        <span class="label">アクチュエーターの状態</span><div class="value">${row[8]}</div>
+		        <span class="label">指令: ${row[6]} / 結果: ${row[7] || "-"}</span></div>
+              <div class="data-item"><span class="label">12Vバッテリー</span><div class="value">${Number(row[9]).toFixed(2)}V</div></div>
+              <div class="data-item"><span class="label">アクチュエーターノード電源電圧</span><div class="value">${gatePicoV}V</div></div>
+              <div class="data-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div><span class="label">📡 電波強度 (RSSI)</span><div class="value">${rssiText}</div></div>
+                <div style="font-weight: bold;">${rssiStatus}</div>
+              </div>
+              <div class="data-item" style="grid-column: span 2;">
+                <span class="label">☁️ 遠隔操作 (センサーノードが<b>STOP</b>の場合のみ予約可。状態反映は最短で35分～最長で1時間後となります。)</span>
+                 <div class="remote-ctrl-row">
+                  <button class="btn-remote open" onclick="sendRemoteCommand('${id}', 'OPEN', '${individualMode}')">開ける</button>
+                  <button class="btn-remote close" onclick="sendRemoteCommand('${id}', 'CLOSE', '${individualMode}')">閉める</button>
+                </div>
+              </div>
+              <div class="data-item" style="grid-column: span 2; background: #f0f4c3;">
+                <span class="label" style="color: #1565C0; font-weight: bold;">🔔 個別通知設定 (変更は即時反映)</span>
+                 <div style="display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap; font-size: 0.85rem; font-weight: bold; color: #333;">
+                  <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" onchange="toggleNodeNotify('GATE', '${id}', this)" ${isGateChecked}>🚪アクチュエーター関連</label>
+                  <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" onchange="toggleNodeNotify('ALERT', '${id}', this)" ${isAlertChecked}>🚨異常</label>
+                  <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" onchange="toggleNodeNotify('WARN', '${id}', this)" ${isWarnChecked}>⚠️電池/電波</label>
+                  <label style="display:flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" onchange="toggleNodeNotify('COMM', '${id}', this)" ${isCommChecked}>🔌通信</label>
+                </div>
+              </div>
+            </div>
+          </div>`;
+        cardsDiv.insertAdjacentHTML('beforeend', html);
+      });
+    }
+
+    document.getElementById('btn-gw-status').style.display = gwFound ? 'inline-block' : 'none';
+
+    rawHistory = [];
+    lastLogData = data.log || []; 
+    updateChartDropdown();
+  }
+
+  function toggleNodeNotify(type, id, checkbox) {
+    if (!id) return;
+    const isChecked = checkbox.checked;
+    const val = isChecked ? "ON" : "OFF";
+    checkbox.disabled = true;
+    callGasApi('', { update_notify: 1, id: id, type: type, val: val })
+      .then(res => {
+        checkbox.disabled = false;
+        if (!notifMap[id]) notifMap[id] = { gate: "ON", alert: "ON", warn: "ON", comm: "ON" };
+        notifMap[id][type.toLowerCase()] = val;
+      })
+      .catch(e => {
+        alert("通知設定の更新に失敗しました: " + e);
+        checkbox.checked = !isChecked;
+        checkbox.disabled = false;
+      });
+  }
+
+  function openGwStatusModal() {
+    const keys = Object.keys(gwLogsMap).sort();
+    if (keys.length === 0) { alert("GWの通信データがまだありません。"); return; }
+    let contentHtml = "";
+    keys.forEach(id => {
+      const row = gwLogsMap[id];
+      const lastSeen = new Date(row[0]).toLocaleString('ja-JP');
+      const vsys = Number(row[4]).toFixed(2);
+      const bat12v = Number(row[9]).toFixed(2);
+      const rssi = row[10] ? `${row[10]} dBm` : '---';
+
+      contentHtml += `
+        <div style="background:#f4f7f6; padding:12px; border-radius:8px; margin-bottom:12px; border-left:4px solid #1976D2;">
+          <div style="font-weight:bold; font-size:1.1rem; margin-bottom:8px; color:#333;">${id}</div>
+          <table style="width:100%; border-collapse: collapse; text-align: left; font-size:0.9rem;">
+            <tr style="border-bottom: 1px solid #ddd;"><th style="padding: 5px 0; color:#666;">⏱ 最終通信</th><td style="font-weight:bold;">${lastSeen}</td></tr>
+            <tr style="border-bottom: 1px solid #ddd;"><th style="padding: 5px 0; color:#666;">⚡ VSYS電圧 (Pico)</th><td style="font-weight:bold;">${vsys} V</td></tr>
+            <tr style="border-bottom: 1px solid #ddd;"><th style="padding: 5px 0; color:#666;">🔋 12Vバッテリー</th><td style="font-weight:bold;">${bat12v} V</td></tr>
+            <tr><th style="padding: 5px 0; color:#666;">📡 電波強度 (RSSI)</th><td style="font-weight:bold;">${rssi}</td></tr>
+          </table>
+        </div>
+      `;
+    });
+    document.getElementById('gw-status-content').innerHTML = contentHtml;
+    document.getElementById('gwStatusModal').style.display = "block";
+  }
+
+  function closeGwStatusModal() { document.getElementById('gwStatusModal').style.display = "none"; }
+
+  function updateHistoryList() {
+    const histDiv = document.getElementById('history-container');
+    histDiv.innerHTML = '';
+    const selectedId = document.getElementById('historyFieldSelect').value;
+
+    let filteredHistory = rawHistory;
+    if (selectedId && selectedId !== "ALL") {
+      filteredHistory = rawHistory.filter(row => row[1] === selectedId);
+    }
+
+    if (filteredHistory.length > 0) {
+      filteredHistory.forEach(row => {
+        if (!row || row.length < 2) return;
+        
+        const ts = new Date(row[0]).toLocaleString('ja-JP', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+        
+        const fieldId     = row[1];
+        const waterLevel  = Number(row[2]).toFixed(2); 
+        const gateCmd     = row[6];                    
+        const commStatus  = row[7];                     
+        const gateStatus  = row[8];                     
+        const gate12V     = Number(row[9]).toFixed(2);  
+        
+        const actClass = gateStatus === 'OPEN' ? 'act-OPEN' : (gateStatus === 'CLOSE' ? 'act-CLOSE' : '');
+        
+        const statusColor = (commStatus === 'SUCCESS' || commStatus === 'NO_ACTION') ? '#2E7D32' : '#C62828';
+        const statusBadge = `<span style="color: ${statusColor}; font-weight: bold; font-size: 0.8rem;">[${commStatus}]</span>`;
+
+        const html = `
+          <div class="history-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+              <div>
+                <span class="hist-id" style="font-size: 1rem;">${fieldId}</span>
+                <span class="hist-time" style="margin-left: 8px;">${ts}</span>
+              </div>
+              <div class="hist-action ${actClass}" style="font-weight: bold; font-size: 1rem;">${gateStatus || '-'}</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.85rem; color: #555;">
+              <div>
+                <span style="font-size: 0.7rem; color: #888; display: block;">水位</span>
+                <strong>${waterLevel} cm</strong>
+              </div>
+              <div>
+                <span style="font-size: 0.7rem; color: #888; display: block;">送信指示 / 結果</span>
+                <strong>${gateCmd || '-'}</strong> ${statusBadge}
+              </div>
+              <div>
+                <span style="font-size: 0.7rem; color: #888; display: block;">アクチュエーター関連バッテリー</span>
+                <strong>${gate12V} V</strong>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        histDiv.insertAdjacentHTML('beforeend', html);
+      });
+    } else {
+      histDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">履歴データがありません</div>';
+    }
+  }
+
+  function updateChartDropdown() {
+    const select    = document.getElementById('fieldSelect');
+    const histSelect = document.getElementById('historyFieldSelect');
+    const prevChart  = select.value;
+    const prevHist   = histSelect.value;
+
+    select.innerHTML = '';
+    histSelect.innerHTML = '<option value="">-- 圃場IDを選択してください --</option>';
+
+    const idSet = new Set();
+    if (lastLogData && lastLogData.length > 0) {
+      lastLogData.forEach(row => {
+        if (!row || !row[1]) return;
+        const id = String(row[1]).trim();
+        if (id && !id.toUpperCase().includes("GW")) idSet.add(id);
+      });
+    }
+    rawHistory.forEach(row => { if (row && row[1]) idSet.add(String(row[1]).trim()); });
+
+    const sortedIds = Array.from(idSet).sort();
+    sortedIds.forEach(id => {
+      const o1 = document.createElement('option'); o1.value = id; o1.text = id; select.appendChild(o1);
+      const o2 = document.createElement('option'); o2.value = id; o2.text = id; histSelect.appendChild(o2);
+    });
+
+    if (prevChart && sortedIds.includes(prevChart)) select.value = prevChart;
+    if (prevHist  && sortedIds.includes(prevHist))  histSelect.value = prevHist;
+
+    if (sortedIds.length > 0) updateChart();
+  }
+
+  function onHistoryIdChange() {
+    const selectedId = document.getElementById('historyFieldSelect').value;
+    if (selectedId) fetchHistory(selectedId);
+  }
+
+  function onChartIdChange() {
+    const selectedId = document.getElementById('fieldSelect').value;
+    if (!selectedId) return;
+    const hasData = rawHistory.some(row => row[1] === selectedId);
+    if (!hasData) {
+      fetchHistory(selectedId);
+    } else {
+      updateChart();
+    }
+  }
+
+  function updateChart() {
+    const selectedId = document.getElementById('fieldSelect').value;
+    if (!selectedId) return;
+
+    const intervalMinutes = parseInt(document.getElementById('intervalSelect').value, 10);
+    const rawFiltered = rawHistory.filter(row => row[1] === selectedId).reverse();
+
+    let prevStat = null;
+    rawFiltered.forEach(row => {
+      const status = row[8];
+      row.isEvent = (prevStat !== null && status !== prevStat);
+      prevStat = status;
+    });
+
+    let filteredData = [];
+    if (intervalMinutes === 0) {
+      filteredData = rawFiltered; 
+    } else {
+      let lastKeptTime = 0;
+      rawFiltered.forEach(row => {
+        const currentTime = new Date(row[0]).getTime();
+        if (row.isEvent || (currentTime - lastKeptTime) >= intervalMinutes * 60 * 1000) {
+          filteredData.push(row);
+          lastKeptTime = currentTime;
+        }
+      });
+    }
+
+    const labels = [];
+    const waterLevels = [];
+    const pointColors = [];
+    const pointStyles = [];
+    const pointRadii = [];
+    const gateStatuses = [];
+
+    filteredData.forEach(row => {
+      const d = new Date(row[0]);
+      let labelStr = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+      
+      if (intervalMinutes >= 720) {
+        labelStr = `${d.getMonth() + 1}/${d.getDate()} ` + labelStr;
+      }
+      
+      labels.push(labelStr);
+      waterLevels.push(row[2]); 
+      gateStatuses.push(row[8]); 
+
+      if (row.isEvent && row[8] === 'OPEN') {
+        pointColors.push('#2E7D32'); pointStyles.push('triangle'); pointRadii.push(6); 
+      } else if (row.isEvent && row[8] === 'CLOSE') {
+        pointColors.push('#C62828'); pointStyles.push('rect'); pointRadii.push(6);     
+      } else {
+        pointColors.push('rgba(33, 150, 243, 0.5)'); pointStyles.push('circle'); pointRadii.push(0); 
+      }
+    });
+
+    const ctx = document.getElementById('myChart').getContext('2d');
+    if (myChart) myChart.destroy();
+    
+    myChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '水位 (cm)',
+          data: waterLevels,
+          borderColor: '#2196F3',
+          backgroundColor: 'rgba(33, 150, 243, 0.1)',
+          borderWidth: 2,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointColors,
+          pointStyle: pointStyles,
+          pointRadius: pointRadii,
+          tension: 0.1,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                const idx = context.dataIndex;
+                const st = gateStatuses[idx];
+                const isEv = filteredData[idx].isEvent;
+                if (isEv && (st === 'OPEN' || st === 'CLOSE')) return `操作: ${st}`;
+                return null;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: '水位 (cm)' }
+          }
+        }
+      }
+    });
+  }
+
+  function populateGroupSelects() {
+    const gwSel = document.getElementById('gw-group-select');
+    const ndSel = document.getElementById('cfg-group');
+
+    gwSel.innerHTML = '<option value="_NEW_">-- 新規グループ作成 --</option>';
+    ndSel.innerHTML = '<option value="">-- グループを選択してください --</option>';
+    Object.keys(groupMap).sort().forEach(gName => {
+      const ch = groupMap[gName].ch;
+      gwSel.innerHTML += `<option value="${gName}">${gName} (CH${ch})</option>`;
+      ndSel.innerHTML += `<option value="${gName}">${gName} (CH${ch})</option>`;
+    });
+  }
+
+  function onGroupChange() {
+    const gName = document.getElementById('cfg-group').value;
+    const gData = (gName && groupMap[gName]) ? groupMap[gName] : { ch: 0, auth: "KOKUFU_2026" };
+
+    document.getElementById('cfg-auth').value = gData.auth;
+    if (!document.getElementById('cfg-ch-override').checked) {
+      document.getElementById('cfg-ch').value = gData.ch;
+    }
+  }
+
+  function onChOverrideChange() {
+    const isOverride = document.getElementById('cfg-ch-override').checked;
+    const chInput = document.getElementById('cfg-ch');
+    if (isOverride) {
+      chInput.disabled = false;
+    } else {
+      chInput.disabled = true;
+      onGroupChange();
+    }
+  }
+
+  function onNodeTypeChange() {
+    const type = document.getElementById('cfg-node-type').value;
+    document.getElementById('cfg-water-fields').style.display    = (type === 'water')    ? '' : 'none';
+    document.getElementById('cfg-offset-field').style.display    = (type === 'water')    ? '' : 'none';
+    document.getElementById('cfg-gas-save-btn').style.display    = (type === 'water')    ? '' : 'none';
+    document.getElementById('cfg-repeater-fields').style.display = (type === 'repeater') ? '' : 'none';
+
+    const overrideContainer = document.getElementById('cfg-ch-override-container');
+    if (type === 'repeater') {
+      overrideContainer.style.display = 'none';
+      document.getElementById('cfg-ch-override').checked = false;
+      document.getElementById('cfg-ch').disabled = true;
+    } else {
+      overrideContainer.style.display = 'block';
+      onChOverrideChange();
+    }
+  }
+
+  function onGwGroupChange() {
+    const sel = document.getElementById('gw-group-select').value;
+    if (sel === '_NEW_') {
+      document.getElementById('gw-new-group-div').style.display = 'block';
+      document.getElementById('gw-group-name').value = '';
+      document.getElementById('gw-auth').value = 'KOKUFU_2026';
+      document.getElementById('gw-ch').value = '0';
+    } else {
+      document.getElementById('gw-new-group-div').style.display = 'none';
+      const gData = groupMap[sel] || { ch: 0, auth: 'KOKUFU_2026' };
+      document.getElementById('gw-group-name').value = sel;
+      document.getElementById('gw-auth').value = gData.auth;
+      document.getElementById('gw-ch').value = gData.ch;
+    }
+  }
+
+  function openModal(id) {
+    const safeId = String(id).trim();
+    const cfg = configMap[safeId] || { disp: safeId, dry: 2.0, full: 6.0, offset: 0, group: "", ch: 0, mode: "RUN", auth: "KOKUFU_2026" };
+    document.getElementById('cfg-id-disp').innerText = cfg.disp;
+    document.getElementById('cfg-id').value = safeId;
+    document.getElementById('cfg-dry').value = cfg.dry;
+    document.getElementById('cfg-full').value = cfg.full;
+    document.getElementById('cfg-offset').value = cfg.offset;
+    document.getElementById('cfg-mode').value = cfg.mode;
+    const grpSel = document.getElementById('cfg-group');
+    if (cfg.group && groupMap[cfg.group]) {
+      grpSel.value = cfg.group;
+    } else {
+      grpSel.selectedIndex = 0;
+    }
+
+    onGroupChange();
+
+    const grpName = grpSel.value;
+    const grpCh = (grpName && groupMap[grpName]) ? groupMap[grpName].ch : 0;
+    if (String(cfg.ch) !== String(grpCh)) {
+      document.getElementById('cfg-ch-override').checked = true;
+      document.getElementById('cfg-ch').disabled = false;
+      document.getElementById('cfg-ch').value = cfg.ch;
+    } else {
+      document.getElementById('cfg-ch-override').checked = false;
+      document.getElementById('cfg-ch').disabled = true;
+    }
+
+    document.getElementById('cfg-rx-ch').value = cfg.ch;
+    document.getElementById('cfg-node-type').value = 'water';
+    onNodeTypeChange();
+
+    const ts = lastSeenMap[safeId];
+    document.getElementById('cfg-last-seen').textContent = ts ? '最終通信: ' + new Date(ts).toLocaleString('ja-JP') : '最終通信: データなし';
+    document.getElementById('configModal').style.display = "block";
+  }
+
+  function closeModal() { document.getElementById('configModal').style.display = "none"; }
+
+  function openGwModal() {
+    document.getElementById('gw-ssid').value = "";
+    document.getElementById('gw-pass').value = "";
+    document.getElementById('gw-apn').value = "";
+    document.getElementById('gw-apn-user').value = "";
+    document.getElementById('gw-apn-pass').value = "";
+    document.getElementById('gw-auth-type').value = "0";
+    document.getElementById('gw-ip-type').value = "IP";
+    document.getElementById('gw-bands').value = "";
+    document.getElementById('gw-gw-id').value = "";
+    onGwGroupChange();
+    document.getElementById('gwConfigModal').style.display = "block";
+  }
+  function closeGwModal() { document.getElementById('gwConfigModal').style.display = "none"; }
+
+  function saveConfigToGas() {
+    const id = document.getElementById('cfg-id').value.trim();
+    const group = document.getElementById('cfg-group').value;
+    if (!id) { alert("ノードIDを入力してください。"); return; }
+    if (!group) { alert("グループを選択してください。"); return; }
+
+    showOverlay('クラウドへ保存中...');
+    const payload = {
+      id,
+      dry: document.getElementById('cfg-dry').value,
+      full: document.getElementById('cfg-full').value,
+      offset: document.getElementById('cfg-offset').value,
+      mode: document.getElementById('cfg-mode').value,
+      groupName: group,
+      ch: document.getElementById('cfg-ch').value
+    };
+    callGasApi('saveFieldConfigCmd', payload).then(() => {
+      hideOverlay(); alert("クラウドへの保存が完了しました。"); loadData();
+    }).catch(e => { hideOverlay(); alert("GAS通信エラー: " + e); });
+  }
+
+  async function writeToUsb(cmdStr) {
+    try {
+      const serial = await getSerialAPI();
+      if (!usbPort) {
+        usbPort = await serial.requestPort({ filters: [{ usbVendorId: 0x2e8a }] });
+        await usbPort.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none", flowControl: "none" });
+      }
+      const writer = usbPort.writable.getWriter();
+      const data = new TextEncoder().encode(cmdStr + "\n");
+      for (let i = 0; i < data.length; i += 32) {
+        await writer.write(data.slice(i, i + 32));
+        await new Promise(r => setTimeout(r, 20));
+      }
+      await new Promise(r => setTimeout(r, 100));
+      writer.releaseLock();
+      return true;
+    } catch (e) {
+      console.error(e);
+      alert("USB接続エラー: ケーブルを一度抜き差ししてやり直してください。\n(" + e.message + ")");
+      usbPort = null;
+      return false;
+    }
+  }
+
+  async function writeConfigToUsb() {
+    const id = document.getElementById('cfg-id').value.trim();
+    const group = document.getElementById('cfg-group').value;
+    const auth = document.getElementById('cfg-auth').value.trim();
+    if (!id) { alert("ノードIDを入力してください。"); return; }
+    if (!group) { alert("グループを選択してください。"); return; }
+    if (!auth) { alert("AUTH_KEYが設定されていません。グループを確認してください。"); return; }
+
+    const type = document.getElementById('cfg-node-type').value;
+    const dry  = (type === 'water') ? document.getElementById('cfg-dry').value : '0';
+    const full = (type === 'water') ? document.getElementById('cfg-full').value : '0';
+    const offset = document.getElementById('cfg-offset').value;
+    const mode = document.getElementById('cfg-mode').value;
+    const ch    = parseInt(document.getElementById('cfg-ch').value, 10);
+    const rx_ch = (type === 'repeater') ? parseInt(document.getElementById('cfg-rx-ch').value, 10) : ch;
+    if (isNaN(ch) || ch < 0 || ch > 14) { alert("チャンネル(CH)は 0 から 14 の範囲で設定してください。"); return; }
+    if (type === 'repeater' && (isNaN(rx_ch) || rx_ch < 0 || rx_ch > 14)) { alert("受信(RX)チャンネルは 0 から 14 の範囲で設定してください。"); return; }
+
+    const now = new Date();
+    const cmd = `SET_CONFIG,${auth},${id},${dry},${full},${offset},${now.getHours()},${now.getMinutes()},${mode},${ch},${rx_ch},${now.getFullYear()},${now.getMonth()+1},${now.getDate()}`;
+    if (await writeToUsb(cmd)) {
+      if (type === 'gate') {
+        usbPort = null;
+        alert("✅ PicoへのUSB書き込みが完了しました。\n\n※ アクチュエーター関連ノードの設定はクラウド(GAS)へは保存されません。\nPicoは再起動します。ケーブルを抜いても構いません。");
+        loadData();
+      } else {
+        showOverlay('Pico書き込み完了。GASへ保存中...');
+        callGasApi('saveFieldConfigCmd', { id, dry, full, offset, mode, groupName: group, ch }).then(() => {
+          hideOverlay();
+          alert("✅ PicoへのUSB書き込み ＆ クラウド(GAS)への設定保存が完了しました！\n\nPicoは再起動します。ケーブルを抜いても構いません。");
+          usbPort = null; loadData();
+        }).catch(e => { hideOverlay(); alert("GAS通信エラー: " + e); usbPort = null; });
+      }
+    }
+  }
+
+  async function writeGwConfigToUsb() {
+    const sel = document.getElementById('gw-group-select').value;
+    const gName = (sel === '_NEW_') ? document.getElementById('gw-group-name').value.replace(/,/g, '').trim() : sel;
+    if (!gName) { alert("グループ名を入力してください。"); return; }
+
+    const auth = document.getElementById('gw-auth').value.trim();
+    if (!auth) { alert("AUTH_KEYを入力してください。"); return; }
+
+    const ch = parseInt(document.getElementById('gw-ch').value, 10);
+    if (isNaN(ch) || ch < 0 || ch > 14) { alert("GW待受チャンネル(CH)は 0 から 14 の範囲で設定してください。"); return; }
+
+    const ssid = document.getElementById('gw-ssid').value.replace(/,/g, '');
+    const pass = document.getElementById('gw-pass').value.replace(/,/g, '');
+    
+    const apn = document.getElementById('gw-apn').value.replace(/,/g, '').trim();
+    const apnUser = document.getElementById('gw-apn-user').value.replace(/,/g, '').trim();
+    const apnPass = document.getElementById('gw-apn-pass').value.replace(/,/g, '').trim();
+    const authType = document.getElementById('gw-auth-type').value;
+    const ipType = document.getElementById('gw-ip-type').value;
+    const bands = document.getElementById('gw-bands').value.replace(/\s/g, '').trim();
+
+    const sendSsid = ssid === "" ? "NO_CHANGE" : ssid;
+    const sendPass = pass === "" ? "NO_CHANGE" : pass;
+    
+    const gwIdRaw = document.getElementById('gw-gw-id').value.replace(/,/g, '').trim();
+    const sendGwId = gwIdRaw === "" ? "NO_CHANGE" : gwIdRaw;
+    
+    let sendApn = "NO_CHANGE", sendApnUser = "NO_CHANGE", sendApnPass = "NO_CHANGE";
+    let sendAuthType = "NO_CHANGE", sendIpType = "NO_CHANGE", sendBands = "NO_CHANGE";
+
+    if (apn !== "") {
+        sendApn = apn;
+        sendApnUser = apnUser === "" ? "_EMPTY_" : apnUser;
+        sendApnPass = apnPass === "" ? "_EMPTY_" : apnPass;
+        sendAuthType = authType;
+        sendIpType = ipType;
+    }
+    if (bands !== "") {
+        sendBands = bands;
+    }
+    
+    const gwOffset = parseInt(document.getElementById('gw-offset').value) || 0;
+
+    const cmd = `SET_GW_CONFIG,${auth},${ch},${sendSsid},${sendPass},${sendGwId},${sendApn},${sendApnUser},${sendApnPass},${sendAuthType},${sendIpType},${gwOffset},${sendBands}`;
+
+    if (await writeToUsb(cmd)) {
+      showOverlay('GW書き込み完了。GASへグループ情報を保存中...');
+      callGasApi('saveGroupConfigCmd', { groupName: gName, ch, auth }).then(() => {
+        hideOverlay();
+        alert("✅ GWへのUSB書き込み ＆ グループ情報の保存が完了しました！\n\nGWは再起動します。ケーブルを抜いても構いません。");
+        usbPort = null; closeGwModal(); loadData();
+      }).catch(e => { hideOverlay(); alert("GAS通信エラー: " + e); usbPort = null; });
+    }
+  }
+
+  function downloadConfigJson() {
+    const type  = document.getElementById('cfg-node-type').value;
+    const id    = document.getElementById('cfg-id').value.trim();
+    const group = document.getElementById('cfg-group').value;
+    const auth  = document.getElementById('cfg-auth').value.trim();
+    if (!id || !group) { alert("IDとグループを正しく設定してください。"); return; }
+
+    const mode = document.getElementById('cfg-mode').value;
+    const ch   = parseInt(document.getElementById('cfg-ch').value, 10);
+
+    let configObj = { auth, id, mode, group, ch };
+    let fileName = "config.json.py";
+
+    if (type === 'water') {
+      configObj.dry = parseFloat(document.getElementById('cfg-dry').value);
+      configObj.full = parseFloat(document.getElementById('cfg-full').value);
+      configObj.offset = parseInt(document.getElementById('cfg-offset').value);
+    } else if (type === 'repeater') {
+      fileName = "repeater_conf.json.py";
+      configObj.listen = parseInt(document.getElementById('cfg-rx-ch').value, 10);
+      configObj.target = ch;
+      delete configObj.ch;
+    }
+
+    const blob = new Blob([JSON.stringify(configObj, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    alert(`「${fileName}」のダウンロードを開始しました。\n\nAndroidアプリ「microREPL」を開き、ダウンロードしたファイルをPicoに転送してください。\n\n※転送後はPicoを再起動すると設定が反映されます。`);
+  }
+
+  async function testManualOpUsb(targetId, cmd) {
+    try {
+      const serial = await getSerialAPI();
+      if (!usbPort) {
+        usbPort = await serial.requestPort({ filters: [{ usbVendorId: 0x2e8a }] });
+        await usbPort.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none", flowControl: "none" });
+      }
+      const writer = usbPort.writable.getWriter();
+      const data = new TextEncoder().encode(cmd + ",\n");
+      for (let i = 0; i < data.length; i += 32) {
+        await writer.write(data.slice(i, i + 32));
+        await new Promise(r => setTimeout(r, 20));
+      }
+      await new Promise(r => setTimeout(r, 50));
+      writer.releaseLock();
+
+      alert(`「${cmd}」を送信しました。\nアクチュエーター関連の動作が完了するまで（約10〜15秒）、ケーブルを抜かずにお待ちください...`);
+      showOverlay('アクチュエーター関連駆動中...');
+
+      const reader = usbPort.readable.getReader();
+      const dec = new TextDecoder();
+      let buffer = "";
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 25000));
+      while (true) {
+        const { value, done } = await Promise.race([reader.read(), timeoutPromise]);
+        if (done) break;
+        if (value) {
+          buffer += dec.decode(value);
+          if (buffer.includes("USB_RESULT")) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.includes("USB_RESULT")) {
+                const parts = line.trim().split(',');
+                if (parts.length >= 6) {
+                  const [, opCmd, status, gate_12v, act_st, gate_v] = parts;
+                  reader.releaseLock();
+                  showOverlay('GASへログ送信中...');
+                  callGasApi('saveManualLogCmd', { id: targetId, opCmd, status, gate_12v, act_st, gate_v }).then(() => {
+                    hideOverlay();
+                    alert(`✅ 動作完了＆クラウド記録成功！\n圃場ID: ${targetId}\n操作: ${opCmd}\n結果: ${status}\n12Vバッテリー: ${gate_12v}V`);
+                    loadData();
+                  }).catch(err => { hideOverlay(); alert("GASログ保存エラー: " + err); });
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+      reader.releaseLock();
+    } catch (e) {
+      hideOverlay();
+      alert(e.message === "TIMEOUT"
+        ? "タイムアウト: 25秒待機しましたが、Picoから応答がありませんでした。"
+        : "USB通信エラー: " + e.message);
+      usbPort = null;
+    }
+  }
+
+  function toggleSystemMode() {
+    const btnText = document.getElementById('btn-mode').textContent;
+    const currentSysMode = btnText.includes('RUN') ? 'RUN' : 'STOP';
+    const nextMode = currentSysMode === 'RUN' ? 'STOP' : 'RUN';
+
+    if (!confirm(`システム全体を「${nextMode}」モードに切り替えますか？\n※設定すると、すべての圃場の自動制御が、約30～1時間後に強制的に切り替わります。`)) return;
+
+    showOverlay('モード変更中...');
+    callGasApi('toggleSystemModeCmd', { currentMode: currentSysMode })
+      .then(() => { loadData(); hideOverlay(); })
+      .catch(e => { hideOverlay(); alert(e); });
+  }
+
+  function toggleMasterNotify() {
+    showOverlay('通知設定変更中...');
+    const currentMasterNotify = document.getElementById('btn-notify').textContent.includes('ON') ? 'ON' : 'OFF';
+    callGasApi('toggleMasterNotifyCmd', { currentVal: currentMasterNotify })
+      .then(() => { loadData(); hideOverlay(); })
+      .catch(e => { hideOverlay(); alert(e); });
+  }
+
+  function sendRemoteCommand(id, cmd, fieldMode) {
+    const safeId = String(id).trim();
+    const dispName = configMap[safeId]?.disp || safeId;
+
+    if (fieldMode !== 'STOP') {
+      alert(
+        `⚠️ 遠隔操作できません\n\n` +
+        `圃場 [${dispName}] のセンサーノードは現在「RUN」モードで自律制御中のため、\n` +
+        `GWからの遠隔指示はセンサーノードのCOMMANDパケットで上書きされます。\n\n` +
+        `遠隔操作を行う場合は、先に圃場の稼働モードを「STOP」に変更してください。`
+      );
+      return;
+    }
+
+    if (!confirm(`圃場 [${dispName}] のアクチュエーター関連を遠隔で「${cmd}」します。よろしいですか？`)) return;
+    showOverlay('コマンド送信予約中...');
+    callGasApi('sendRemoteCmd', { id: safeId, cmd })
+      .then(() => { hideOverlay(); alert("送信予約完了"); })
+      .catch(e => { hideOverlay(); alert(e); });
+  }
+
+  function toggleFieldMode(id, individualMode, globalMode) {
+    if (globalMode === 'STOP') {
+      alert("⚠️ システム全体が「STOP」に設定されているため、個別圃場の稼働モード変更がロックされています。\n先にヘッダーの「一括稼働開始・停止ボタン」をRUNにしてください。");
+      return;
+    }
+
+    const safeId = String(id).trim();
+    const dispName = configMap[safeId]?.disp || safeId;
+    const nextMode = individualMode === "RUN" ? "STOP" : "RUN";
+    
+    if (!confirm(`圃場 [${dispName}] を「${nextMode}」モードに切り替えますか？反映は約30～1時間後となります。`)) return;
+    
+    showOverlay('モード変更中...');
+
+    callGasApi('toggleFieldModeCmd', { id: safeId, val: individualMode })
+      .then(res => {
+        hideOverlay();
+        loadData(); 
+      })
+      .catch(e => {
+        hideOverlay();
+        alert("モード変更に失敗しました: " + e);
+      });
+  }
+
+  function deleteFieldId() {
+    const id = document.getElementById('cfg-id').value.trim();
+    if (!id) return;
+    
+    const dispName = document.getElementById('cfg-id-disp').innerText;
+
+    if (!confirm(`【警告】\n圃場 [${dispName}] (${id}) の全データ(ID・設定)を完全に削除します。\nこの操作は取り消せません。本当によろしいですか？`)) {
+      return;
+    }
+
+    showOverlay('削除中...');
+    
+    callGasApi('deleteFieldIdCmd', { id: id })
+      .then(res => {
+        hideOverlay();
+        closeModal();
+        alert(`✅ 圃場 [${dispName}] の削除が完了しました。`);
+        loadData();
+      })
+      .catch(e => {
+        hideOverlay();
+        alert("削除に失敗しました: " + e);
+      });
+  }
+
+</script>
+</body>
+</html>
