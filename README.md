@@ -33,7 +33,7 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
 
 ## 🚀 始め方 (Getting Started)
 
-詳細なセットアップ手順や配線図、部品リストについては、同梱の `📘 水田水位自動管理システム 統合取扱説明書.docx` をご参照ください。
+詳細なセットアップ手順や配線図、部品リストについては、[AgriSynapseの紹介ページ](https://greenrice-wtnb-farm.jimdofree.com/agrisynapse/?preview_sid=358720)または同梱の `📘 水田水位自動管理システム 統合取扱説明書.docx` をご参照ください。
 
 ### 大まかな導入ステップ
 1. **クラウドの準備**
@@ -88,7 +88,7 @@ AgriSynapse consists of the following hardware nodes and cloud components:
 
 ## 🚀 Getting Started
 
-For detailed setup instructions, wiring diagrams, and parts lists, please refer to the included `📘 水田水位自動管理システム 統合取扱説明書.docx` (Comprehensive Instruction Manual - currently in Japanese).
+For detailed setup instructions, wiring diagrams, and parts lists, please refer to the [AgriSynapse WebSite (in Japanese)](https://greenrice-wtnb-farm.jimdofree.com/agrisynapse/?preview_sid=358720) or included `📘 水田水位自動管理システム 統合取扱説明書.docx` (Comprehensive Instruction Manual - currently in Japanese).
 
 ### Basic Setup Steps
 1. **Cloud Preparation**
