@@ -1,0 +1,826 @@
+/*
+ * Copyright (C) 2026 AgriSynapse Project
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+// ★ エディタから手動実行するための初期セットアップ用関数
+function myFunction() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Logシート作成
+  if (!ss.getSheetByName("Log")) {
+    ss.insertSheet("Log").appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+  }
+  // ID_LISTシート作成
+  if (!ss.getSheetByName("ID_LIST")) {
+    ss.insertSheet("ID_LIST").appendRow(["Field_ID", "表示名", "送信オフセット", "グループ", "稼働モード", "最終通信", "", "", "", "", "", "", "通信状態"]);
+  }
+  // SYSTEMシート作成
+  if (!ss.getSheetByName("SYSTEM")) {
+    const sys = ss.insertSheet("SYSTEM");
+    sys.getRange("A1").setValue("RUN");
+    sys.getRange("B1").setValue("ON");
+    sys.getRange("E1").setValue(15);
+  }
+  
+  try {
+    SpreadsheetApp.getUi().alert("✅ 初期シートの作成が完了しました！");
+  } catch(e) {
+    console.log("✅ 初期シートの作成が完了しました！(UI非表示環境での実行)");
+  }
+}
+
+
+// ★履歴閲覧用ダッシュボードのSpreadsheet ID（適宜書き換えてください）
+const DASHBOARD_SS_ID = "XXXXXXXXXXXXXXXXXXXXXXXXX";
+
+function sendMessagingApiPush(msg, fid) { 
+  // ★DISCORDのWebhookURL（適宜書き換えてください）
+  const webhookUrl = "https://discord.com/api/webhooks/XXXXXXXXXXXXXXXXXXXX";
+  const title = (fid === "一括通知システム") ? "" : "**【" + fid + "】**\n";
+  const payload = { content: title + msg };
+  const options = { method: "post", contentType: "application/json", payload: JSON.stringify(payload) };
+  try { UrlFetchApp.fetch(webhookUrl, options); } catch(e) {}
+}
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  var lockReleased = false;
+  try { 
+    lock.waitLock(10000);
+  } catch (err) { 
+    return ContentService.createTextOutput(JSON.stringify({error: "BUSY"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (e.postData && e.postData.contents) {
+      let batchData = [];
+      try { batchData = JSON.parse(e.postData.contents); } catch(err) {}
+
+      if (Array.isArray(batchData) && batchData.length > 0) {
+        const systemSheet = ss.getSheetByName("SYSTEM") || ss.insertSheet("SYSTEM");
+        setupSystemSheet(systemSheet);
+        let globalMode = systemSheet.getRange("A1").getValue();
+        if (globalMode !== "STOP" && globalMode !== "RUN") { 
+            globalMode = "RUN";
+            systemSheet.getRange("A1").setValue("RUN");
+        }
+        
+        let masterNotify = systemSheet.getRange("B1").getValue();
+        if (masterNotify !== "OFF" && masterNotify !== "ON") { 
+            masterNotify = "ON";
+            systemSheet.getRange("B1").setValue("ON");
+        }
+
+        let responseConfig = {};
+        const isSingleUrgent = (batchData.length === 1);
+        let bulkAlerts = isSingleUrgent ? null : [];
+
+        for (let i = 0; i < batchData.length; i++) {
+          let p = batchData[i];
+          if (p && p.id) { 
+              responseConfig[p.id] = processNodeData(ss, p, globalMode, masterNotify, bulkAlerts);
+          }
+        }
+        
+        if (!isSingleUrgent && bulkAlerts !== null && bulkAlerts.length > 0) { 
+            sendMessagingApiPush(bulkAlerts.join("\n\n"), "一括通知システム");
+        }
+
+        let commands = [];
+        const cmdSheet = ss.getSheetByName("REMOTE_CMD");
+        if (cmdSheet) {
+          const data = cmdSheet.getDataRange().getValues();
+          for (let i = 1; i < data.length; i++) {
+            if (data[i][2] === "PENDING") {
+              commands.push({id: String(data[i][0]).trim(), cmd: data[i][1]});
+              cmdSheet.getRange(i + 1, 3).setValue("SENT");
+            }
+          }
+        }
+
+        return ContentService.createTextOutput(JSON.stringify({ CONFIG: responseConfig, COMMANDS: commands })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    // ロックを解放してからdoGetに委譲
+    lock.releaseLock();
+    lockReleased = true;
+    return doGet(e);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.message || err.toString(), stack: err.stack })).setMimeType(ContentService.MimeType.JSON);
+  } finally { 
+      if (!lockReleased) lock.releaseLock(); 
+  }
+}
+
+function doGet(e) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (err) { 
+      return ContentService.createTextOutput(JSON.stringify({error: "BUSY"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const p = e.parameter;
+    
+    if (p.action) {
+      if (p.action === "getLatestStatusAll") { 
+        return ContentService.createTextOutput(getLatestStatusAll(ss)).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "getDataForWeb") { 
+        return ContentService.createTextOutput(getDataForWeb(ss, p.targetId)).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "saveFieldConfigCmd") { 
+        saveFieldConfigCmd(ss, p.id, p.dry, p.full, p.offset, p.mode, p.groupName, p.ch);
+        return ContentService.createTextOutput(JSON.stringify({result:"OK"})).setMimeType(ContentService.MimeType.JSON); 
+      }
+      if (p.action === "saveGroupConfigCmd") { 
+        saveGroupConfigCmd(ss, p.groupName, p.ch, p.auth); 
+        return ContentService.createTextOutput(JSON.stringify({result:"OK"})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "sendRemoteCmd") { 
+        sendRemoteCmd(ss, p.id, p.cmd); 
+        return ContentService.createTextOutput(JSON.stringify({result:"OK"})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "toggleSystemModeCmd") { 
+        return ContentService.createTextOutput(JSON.stringify({mode:toggleSystemModeCmd(ss, p.currentMode)})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "toggleMasterNotifyCmd") { 
+        return ContentService.createTextOutput(JSON.stringify({notify:toggleMasterNotifyCmd(ss, p.currentVal)})).setMimeType(ContentService.MimeType.JSON);
+      }
+      // ★ 修正: toggleFieldModeCmdをactionディスパッチで処理。
+      //   HTMLからGETで action=toggleFieldModeCmd&id=...&val=... を受け取り、
+      //   ID_LISTのモード列のみを更新する。閾値は一切変更しない。
+      if (p.action === "toggleFieldModeCmd") {
+        const nextMode = toggleFieldModeCmd(ss, p.id, p.val);
+        return ContentService.createTextOutput(JSON.stringify({result:"OK", mode: nextMode})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "saveManualLogCmd") { 
+        saveManualLogCmd(ss, p.id, p.opCmd, p.status, p.gate_12v, p.act_st, p.gate_v); 
+        return ContentService.createTextOutput(JSON.stringify({result:"OK"})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (p.action === "registerGwNode") {
+        if (!p.id || String(p.id).trim() === "") return ContentService.createTextOutput(JSON.stringify({error:"INVALID_ID"})).setMimeType(ContentService.MimeType.JSON);
+        if (p.groupName && p.groupName !== "-" && p.groupName !== "_NEW_") { saveGroupConfigCmd(ss, p.groupName, p.ch || 0, p.auth || ""); }
+        const systemSheet = ss.getSheetByName("SYSTEM") || ss.insertSheet("SYSTEM");
+        setupSystemSheet(systemSheet);
+        const regResult = registerIdWithLimit(ss, systemSheet, p.id);
+        if (regResult.status === "BLOCKED") return ContentService.createTextOutput(JSON.stringify({error: "LIMIT_ERROR"})).setMimeType(ContentService.MimeType.JSON);
+        
+        let logSheet = ss.getSheetByName("Log");
+        if (!logSheet) {
+          logSheet = ss.insertSheet("Log");
+          logSheet.appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+        }
+        updateLogSheetThreshold(logSheet, p.id, 0, 0); 
+        
+        const idSheet = ss.getSheetByName("ID_LIST");
+        if (idSheet) {
+          const idData = idSheet.getDataRange().getValues();
+          for (let i = 1; i < idData.length; i++) {
+            if (String(idData[i][0]).trim() === String(p.id).trim()) {
+              if (p.groupName) idSheet.getRange(i + 1, 4).setValue(p.groupName);
+              idSheet.getRange(i + 1, 5).setValue("RUN"); break; 
+            }
+          }
+        }
+        return ContentService.createTextOutput(JSON.stringify({result:"OK", id: p.id})).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    if (!p.id && !p.action && !p.check_cmd && !p.get_wifi_list && !p.get_group_list && !p.get_id_list && !p.set_notify && !p.update_notify && !p.set_threshold && !p.toggle_field_mode && !p.manual_log) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "GAS API is running" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const systemSheet = ss.getSheetByName("SYSTEM") || ss.insertSheet("SYSTEM"); setupSystemSheet(systemSheet);
+    let globalMode = systemSheet.getRange("A1").getValue();
+    if (globalMode !== "STOP" && globalMode !== "RUN") { globalMode = "RUN"; systemSheet.getRange("A1").setValue("RUN"); }
+    let masterNotify = systemSheet.getRange("B1").getValue(); 
+    if (masterNotify !== "OFF" && masterNotify !== "ON") { masterNotify = "ON"; systemSheet.getRange("B1").setValue("ON"); }
+
+    if (p.set_notify) { 
+        const newMode = (p.set_notify.toUpperCase() === "OFF") ? "OFF" : "ON"; 
+        systemSheet.getRange("B1").setValue(newMode);
+        return ContentService.createTextOutput("MASTER_NOTIFY_" + newMode); 
+    }
+    if (p.update_notify) return ContentService.createTextOutput(updateNotificationConfig(ss, p.id, p.type, p.val));
+    if (p.toggle_field_mode) return ContentService.createTextOutput(toggleFieldModeCmd(ss, p.id, p.val));
+    if (p.get_wifi_list) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+    if (p.get_group_list) {
+      const groupSheet = ss.getSheetByName("GROUP_LIST"); let gList = [];
+      if (groupSheet) {
+        const gData = groupSheet.getDataRange().getValues();
+        for (let i = 1; i < gData.length; i++) { if (gData[i][0]) gList.push({ name: String(gData[i][0]).trim(), ch: parseInt(gData[i][1]) || 0, auth: String(gData[i][2] || "").trim() }); }
+      }
+      return ContentService.createTextOutput(JSON.stringify(gList)).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    if (p.get_id_list) return getIdList(ss);
+    if (p.set_threshold) {
+      if (!p.id || String(p.id).trim() === "") return ContentService.createTextOutput("INVALID_ID");
+      const regResult = registerIdWithLimit(ss, systemSheet, p.id);
+      if (regResult.status === "BLOCKED") return ContentService.createTextOutput("LIMIT_ERROR");
+      
+      let logSheet = ss.getSheetByName("Log");
+      if (!logSheet) {
+        logSheet = ss.insertSheet("Log");
+        logSheet.appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+      }
+      updateLogSheetThreshold(logSheet, p.id, p.dry_v, p.full_v);
+
+      const idSheet = ss.getSheetByName("ID_LIST");
+      if (idSheet) {
+        const idData = idSheet.getDataRange().getValues();
+        for (let i = 1; i < idData.length; i++) {
+          if (String(idData[i][0]).trim() !== String(p.id).trim()) continue;
+
+          // 稼働モード更新（既存）
+          if (p.mode) idSheet.getRange(i + 1, 5).setValue(p.mode);
+
+          // ★ 送信オフセット更新（ID_LIST列3）
+          if (p.offset !== undefined && p.offset !== null && String(p.offset).trim() !== "") {
+            idSheet.getRange(i + 1, 3).setValue(parseInt(p.offset) || 0);
+          }
+
+          // ★ ch / auth から GROUP_LIST を逆引きして ID_LIST のグループ列を更新する。
+          //   水位ノードで ch/auth を変更した = 別のGWグループへ移管を意味するため、
+          //   既存グループの ch を書き換えるのではなく、
+          //   ch・auth が一致するグループを探して ID_LIST の所属グループ列を更新する。
+          const hasCh   = (p.ch   !== undefined && p.ch   !== null && String(p.ch).trim()   !== "");
+          const hasAuth = (p.auth !== undefined && p.auth !== null && String(p.auth).trim()  !== "");
+          if (hasCh || hasAuth) {
+            const groupSheet = ss.getSheetByName("GROUP_LIST");
+            if (groupSheet) {
+              const gData = groupSheet.getDataRange().getValues();
+              let matchedGroup = null;
+              for (let j = 1; j < gData.length; j++) {
+                if (!gData[j][0]) continue;
+                const groupCh   = parseInt(gData[j][1]);
+                const groupAuth = String(gData[j][2] || "").trim();
+                // ch と auth の両方が指定された場合は両方一致するグループを探す
+                // 片方のみ指定の場合はその項目だけで照合する
+                const chMatch   = !hasCh   || groupCh   === parseInt(p.ch);
+                const authMatch = !hasAuth || groupAuth === String(p.auth).trim();
+                if (chMatch && authMatch) {
+                  matchedGroup = String(gData[j][0]).trim();
+                  break;
+                }
+              }
+              if (matchedGroup) {
+                // 一致するグループが見つかった → ID_LIST の所属グループ列を更新
+                idSheet.getRange(i + 1, 4).setValue(matchedGroup);
+              }
+              // 一致するグループが見つからない場合は現状維持（意図しない上書きを防ぐ）
+            }
+          }
+          break;
+        }
+      }
+
+      appendToDashboard([new Date(), p.id, "SET_CONFIG", "Dry:" + p.dry_v, "Full:" + p.full_v, "", "", "SUCCESS", "", "", "", "", ""]);
+      if (masterNotify === "ON") sendMessagingApiPush("【設定完了】\n圃場:" + p.id + "\nDry:" + p.dry_v + "cm Full:" + p.full_v + "cm" + (p.mode ? " Mode:" + p.mode : ""), p.id);
+      return ContentService.createTextOutput(JSON.stringify({result: "SET_OK", dry: p.dry_v, full: p.full_v, mode: p.mode || "RUN"})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    let resStr = processNodeData(ss, p, globalMode, masterNotify);
+    return ContentService.createTextOutput(JSON.stringify({status: resStr})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) { 
+      return ContentService.createTextOutput(JSON.stringify({ error: err.message || err.toString(), stack: err.stack })).setMimeType(ContentService.MimeType.JSON);
+  } finally { 
+      lock.releaseLock();
+  }
+}
+
+// =========================================================
+// ★ API用: 軽量初回取得（全ノードの最新ステータスとシステム設定）
+// =========================================================
+function getLatestStatusAll(ss) {
+  const sysSheet = ss.getSheetByName("SYSTEM");
+  const mode = sysSheet ? sysSheet.getRange("A1").getValue() : "UNKNOWN";
+  const notify = sysSheet ? sysSheet.getRange("B1").getValue() : "UNKNOWN";
+  
+  const logSheet = ss.getSheetByName("Log"); 
+  let logData = [];
+  if (logSheet) { 
+    const raw = logSheet.getDataRange().getValues(); 
+    if (raw.length > 1) logData = raw.slice(1); 
+  }
+  
+  let notifMap = {}; 
+  const notifSheet = ss.getSheetByName("NOTIFICATION");
+  if (notifSheet) { 
+    const rawNotif = notifSheet.getDataRange().getValues(); 
+    for (let i = 1; i < rawNotif.length; i++) { 
+      const nid = String(rawNotif[i][0]).trim();
+      if (nid) notifMap[nid] = { 
+        gate: rawNotif[i][1]!=="OFF"?"ON":"OFF", 
+        alert: rawNotif[i][2]!=="OFF"?"ON":"OFF", 
+        warn: rawNotif[i][3]!=="OFF"?"ON":"OFF", 
+        comm: rawNotif[i][4]!=="OFF"?"ON":"OFF" 
+      };
+    } 
+  }
+  
+  let fieldsConfig = {}; 
+  const idSheet = ss.getSheetByName("ID_LIST");
+  if (idSheet) {
+    const idData = idSheet.getDataRange().getValues();
+    for (let i = 1; i < idData.length; i++) {
+      if (!idData[i][0]) continue;
+      const fid = String(idData[i][0]).trim(); if (fid === "") continue;
+      let dispName = fid;
+      if (idData[i][1] && String(idData[i][1]).trim() !== "") { dispName = String(idData[i][1]).trim(); }
+      fieldsConfig[fid] = { 
+        disp: dispName, offset: idData[i][2] !== "" ? idData[i][2] : 0, 
+        group: idData[i][3] || "-", mode: idData[i][4] === "STOP" ? "STOP" : "RUN", 
+        dry: 6.0, full: 10.0, ch: 0 
+      };
+    }
+  }
+  
+  if (logSheet) {
+    const lg = logSheet.getDataRange().getValues();
+    for(let i=1; i<lg.length; i++) {
+      if (!lg[i][1]) continue; const fid = String(lg[i][1]).trim();
+      if(fid && fieldsConfig[fid]) { 
+        fieldsConfig[fid].dry = lg[i][13]!=="" ? lg[i][13] : fieldsConfig[fid].dry; 
+        fieldsConfig[fid].full = lg[i][14]!=="" ? lg[i][14] : fieldsConfig[fid].full;
+      }
+    }
+  }
+  
+  let groupMap = {}; 
+  const groupSheet = ss.getSheetByName("GROUP_LIST");
+  if (groupSheet) { 
+    const gData = groupSheet.getDataRange().getValues(); 
+    for(let i=1; i<gData.length; i++) { 
+      if(gData[i][0]) { 
+        groupMap[String(gData[i][0]).trim()] = { ch: parseInt(gData[i][1]) || 0, auth: String(gData[i][2] || "KOKUFU_2026").trim() }; 
+      } 
+    } 
+  }
+  
+  for (let fid in fieldsConfig) { 
+    const grp = String(fieldsConfig[fid].group).trim();
+    if (groupMap[grp]) { 
+      fieldsConfig[fid].ch = groupMap[grp].ch; fieldsConfig[fid].auth = groupMap[grp].auth; 
+    } else { 
+      fieldsConfig[fid].ch = 0; fieldsConfig[fid].auth = "KOKUFU_2026";
+    } 
+  }
+  
+  return JSON.stringify({ system: { mode: mode, notify: notify }, log: logData, history: [], notifications: notifMap, configMap: fieldsConfig, groupMap: groupMap });
+}
+
+// =========================================================
+// ★ API用: 動的履歴取得（指定IDの履歴のみを取得）
+// =========================================================
+function getDataForWeb(ss, targetId) {
+  let historyData = [];
+  if (DASHBOARD_SS_ID) {
+    try {
+      const dashSs = SpreadsheetApp.openById(DASHBOARD_SS_ID);
+      const histSheet = dashSs.getSheetByName("History");
+      if (histSheet) { 
+        const lastRow = histSheet.getLastRow();
+        const fetchCount = Math.min(4500, lastRow - 1);
+        const startRow = Math.max(2, lastRow - fetchCount + 1);
+        const numRows = lastRow - startRow + 1; 
+        if (numRows > 0) {
+          const rawData = histSheet.getRange(startRow, 1, numRows, 16).getValues();
+          historyData = rawData
+            .filter(row => String(row[1]).trim() === String(targetId).trim())
+            .reverse()
+            .slice(0, 500);
+        }
+      }
+    } catch(e) {}
+  }
+  
+  const logSheet = ss.getSheetByName("Log"); 
+  let logData = [];
+  if (logSheet) { 
+    const raw = logSheet.getDataRange().getValues(); 
+    if (raw.length > 1) logData = raw.slice(1); 
+  }
+
+  return JSON.stringify({ log: logData, history: historyData });
+}
+
+function processNodeData(ss, p, globalMode, masterNotify, bulkAlerts = null) {
+  if (!p.id || String(p.id).trim() === "" || String(p.id).trim() === "undefined") return "INVALID_ID";
+  let logSheet = ss.getSheetByName("Log");
+  if (!logSheet) {
+    logSheet = ss.insertSheet("Log");
+    logSheet.appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+  }
+
+  let idSheet = ss.getSheetByName("ID_LIST");
+  if (!idSheet) {
+    idSheet = ss.insertSheet("ID_LIST");
+    idSheet.appendRow(["Field_ID", "表示名", "送信オフセット", "グループ", "稼働モード", "最終通信", "", "", "", "", "", "", "通信状態"]);
+  }
+
+  let responseThresholds = "3.0,15.0";
+  let lastGateStatus = null; let targetRow = -1; let prevRow = null;
+  const logData = logSheet.getDataRange().getValues();
+  for (let i = 1; i < logData.length; i++) {
+    if (String(logData[i][1]).trim() === String(p.id).trim()) { 
+        targetRow = i + 1;
+        prevRow = logData[i]; const d = logData[i][13]; const f = logData[i][14];
+        if (d !== "" && f !== "" && d != null && f != null) responseThresholds = d + "," + f;
+        lastGateStatus = logData[i][8]; break; 
+    }
+  }
+
+  let fieldMode = "RUN";
+  const idData = idSheet.getDataRange().getValues();
+  for (let i = 1; i < idData.length; i++) { if (String(idData[i][0]).trim() === String(p.id).trim()) { if (idData[i][4] === "STOP") fieldMode = "STOP"; break; } }
+  
+  const effectiveMode = (globalMode === "STOP" || fieldMode === "STOP") ? "STOP" : "RUN";
+  const voltParam = parseFloat(p.volt); const finalVolt = (!isNaN(voltParam)) ? voltParam : (prevRow ? prevRow[2] : 0.0);
+  const levelParam = parseFloat(p.level);
+  const finalLevel = (!isNaN(levelParam)) ? levelParam : (prevRow ? prevRow[3] : 0);
+  const p_vParam = parseFloat(p.p_v);
+  const finalPV = (!isNaN(p_vParam) && p_vParam > 0) ? p_vParam : (prevRow ? prevRow[4] : 0.0);
+  const gate_vParam = parseFloat(p.gate_v);
+  const finalGateV = (!isNaN(gate_vParam) && gate_vParam > 0) ? gate_vParam : (prevRow ? prevRow[5] : 0.0);
+  const rawGate = (p.gate && p.gate.trim() !== "") ? p.gate.trim() : "";
+  const finalGate = (p.gate && p.gate.trim() !== "") ? p.gate.trim() : (prevRow ? prevRow[6] : "KEEP");
+  const finalStatus = (p.status && p.status.trim() !== "") ? p.status : (prevRow ? prevRow[7] : "UNKNOWN");
+  const finalGStatus = (p.g_status && p.g_status.trim() !== "" && p.g_status !== "UNKNOWN") ? p.g_status : (prevRow ? prevRow[8] : "UNKNOWN");
+  const gate12VParam = parseFloat(p.gate_12v) || parseFloat(p.gate_ma);
+  const finalGate12V = (!isNaN(gate12VParam) && gate12VParam > 0) ? gate12VParam : (prevRow ? parseFloat(prevRow[9]) || 0.0 : 0.0);
+  const rssiParam = parseFloat(p.rssi);
+  const finalRssi = (!isNaN(rssiParam) && rssiParam !== 0) ? rssiParam : (prevRow ? prevRow[10] : "");
+  const finalSErr = (p.s_err && p.s_err.trim() !== "") ? p.s_err : (prevRow ? prevRow[11] : "NORMAL");
+  const finalActSt = (p.act_st && p.act_st.trim() !== "" && p.act_st !== "UNKNOWN") ? p.act_st : (prevRow ? prevRow[12] : "UNKNOWN");  
+  const prevVolt = prevRow ? parseFloat(prevRow[2]) : null;
+  const prevLevel = prevRow ? parseFloat(prevRow[3]) : null;
+  /*
+   * ★ prevLevel(Row[3])の前回値参照はデフォルトのコード内では使用されませんが、将来的にRow[3]に別途センサーの値を割り当て、
+　 * 通知を設定する場合に必要になります。将来的拡張のために残しています。
+   */
+
+   
+
+  if (effectiveMode === "RUN" && masterNotify === "ON") {
+    const conf = getNotificationConfig(ss, p.id);
+    let alerts = [];
+    if (conf.gate && lastGateStatus !== null && lastGateStatus !== "" && lastGateStatus !== "UNKNOWN") {
+      if (finalGStatus === "OPEN" && lastGateStatus !== "OPEN") alerts.push("水門が開きました");
+      if (finalGStatus === "CLOSE" && lastGateStatus !== "CLOSE") alerts.push("水門が閉まりました");
+    }
+    if (conf.alert) { 
+        if (finalSErr === "ERROR") alerts.push(" 🚨 水位センサー異常");
+        if (finalActSt === "ACT_ERR") alerts.push(" 🚨 水門アクチュエータ異常"); 
+    }
+    if (conf.comm) {
+      if (rawGate !== "KEEP" && rawGate !== "" && finalStatus !== "SUCCESS" && finalStatus !== "NO_ACTION") alerts.push(" 🚨 水門指示送信失敗: " + finalStatus);
+      else if ((rawGate === "KEEP" || rawGate === "") && finalStatus === "TIMEOUT") alerts.push(" 🚨 通信異常検知　圃場ID" + p.id + "　水門との通信失敗　要現地確認");
+    }
+    if (conf.warn) {
+      if (finalGate12V > 0 && finalGate12V <= 11.0) alerts.push(" ‼️ 水門バッテリー危険域: " + finalGate12V + "V");
+      else if (finalGate12V > 11.0 && finalGate12V <= 11.8) alerts.push(" ⚠️ 水門バッテリー低下: " + finalGate12V + "V");
+      if (finalPV > 0 && finalPV < 2.2) alerts.push(" 🪫 水位Pico電圧低下");
+      if (finalGateV > 0 && finalGateV < 2.6) alerts.push(" 🪫 水門Pico電圧低下");
+      if (finalRssi && parseFloat(finalRssi) <= -115) alerts.push(" 📶 通信状態悪化: " + finalRssi + "dBm");
+    }
+    if (alerts.length > 0) { 
+        if (bulkAlerts !== null) { bulkAlerts.push("**【" + p.id + "】**\n" + alerts.join("\n")); } 
+        else { sendMessagingApiPush(alerts.join("\n"), p.id); } 
+    }
+  } 
+  else if (effectiveMode === "STOP" && masterNotify === "ON") {
+    const thresholds = responseThresholds.split(",");
+    const dryTh = parseFloat(thresholds[0]);
+    const fullTh = parseFloat(thresholds[1]);
+    
+    let alerts = [];
+    if (!isNaN(finalVolt) && prevVolt !== null && !isNaN(prevVolt) && !isNaN(dryTh) && !isNaN(fullTh)) {
+      if (prevVolt > dryTh && finalVolt <= dryTh) alerts.push("圃場ID" + p.id + ": ⚠️水位が低下しています");
+      if (prevVolt < fullTh && finalVolt >= fullTh) alerts.push("圃場ID" + p.id + ":✅満水になりました");
+    }
+
+        
+	if (alerts.length > 0) { 
+        if (bulkAlerts !== null) { bulkAlerts.push("**【" + p.id + "】**\n" + alerts.join("\n")); } 
+        else { sendMessagingApiPush(alerts.join("\n"), p.id); } 
+    }
+  }
+
+  const newRowData = [ new Date(), p.id, finalVolt, finalLevel, finalPV, finalGateV, finalGate, finalStatus, finalGStatus, finalGate12V, finalRssi, finalSErr, finalActSt ];
+  if (targetRow !== -1) logSheet.getRange(targetRow, 1, 1, 13).setValues([newRowData]); else logSheet.appendRow(newRowData);
+  applyCellFormatting(logSheet, targetRow !== -1 ? targetRow : logSheet.getLastRow(), p, finalGate12V, finalPV, finalGateV, finalSErr, finalActSt);
+  appendToDashboard(newRowData, p.e_log); 
+  updateLastActiveTime(ss, p.id);
+  
+  return responseThresholds + "," + effectiveMode;
+}
+
+function updateLogSheetThreshold(sheet, id, dry, full) {
+  if (!id || String(id).trim() === "") return "INVALID";
+  // ★ ガード処理: dry/full が有効な数値の場合のみ書き込む。
+  //   空欄・null・数値でない値が送られてきた場合は既存セルを保持する。
+  const isDryValid  = (dry  !== undefined && dry  !== null && String(dry).trim()  !== "" && !isNaN(parseFloat(dry)));
+  const isFullValid = (full !== undefined && full !== null && String(full).trim() !== "" && !isNaN(parseFloat(full)));
+  if (!isDryValid && !isFullValid) return "NO_CHANGE";
+  const data = sheet.getDataRange().getValues();
+  let targetRow = -1;
+  for (let i = 1; i < data.length; i++) { if (String(data[i][1]).trim() === String(id).trim()) { targetRow = i + 1; break; } }
+  if (targetRow !== -1) { 
+      if (isDryValid)  sheet.getRange(targetRow, 14).setValue(parseFloat(dry));
+      if (isFullValid) sheet.getRange(targetRow, 15).setValue(parseFloat(full));
+      sheet.getRange(targetRow, 1).setValue(new Date()).setNumberFormat('yyyy/MM/dd HH:mm:ss');
+  } else { 
+      sheet.appendRow([new Date(), id, "SET_CONFIG", "", "", "", "", "", "", "", "", "", "NORMAL",
+                       isDryValid ? parseFloat(dry) : "", isFullValid ? parseFloat(full) : ""]);
+      sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('yyyy/MM/dd HH:mm:ss'); 
+  }
+  return "UPDATED";
+}
+
+function registerIdWithLimit(ss, sys, id) {
+  let idSheet = ss.getSheetByName("ID_LIST");
+  if (!idSheet) {
+    idSheet = ss.insertSheet("ID_LIST");
+    idSheet.appendRow(["Field_ID", "表示名", "送信オフセット", "グループ", "稼働モード", "最終通信", "", "", "", "", "", "", "通信状態"]);
+  }
+  const data = idSheet.getDataRange().getValues(); let idExists = false;
+  for (let i = 1; i < data.length; i++) { if (String(data[i][0]).trim() === String(id).trim()) { idExists = true; break; } }
+  if (!idExists) {
+    const currentCount = idSheet.getLastRow() - 1; let limit = sys.getRange("E1").getValue() || 15;
+    if (currentCount >= limit) { 
+        if (sys.getRange("E2").getValue() === "YES") { sys.getRange("E1").setValue(limit + 15); sys.getRange("E2").clearContent(); } 
+        else return {status: "BLOCKED"};
+    }
+    idSheet.appendRow([id, "", "", "", "RUN", new Date(), "", "", "", "", "", "", "NORMAL", "", ""]);
+    idSheet.getRange(idSheet.getLastRow(), 6).setNumberFormat('yyyy/MM/dd HH:mm:ss');
+  }
+  return {status: idExists ? "UPDATED" : "REGISTERED"};
+}
+
+function onEdit(e) {
+  const sheet = e.source.getActiveSheet();
+  const range = e.range;
+  if (sheet.getName() === "SYSTEM" && range.getRow() === 1 && range.getColumn() === 5) {
+    if (e.oldValue !== undefined) range.setValue(e.oldValue);
+    else range.setValue(15);
+    e.source.toast("⛔ E1セルは自動管理されています。", "操作ブロック"); return;
+  }
+  if (sheet.getName() === "ID_LIST") { if (range.getColumn() === 1) syncIdListToNotification(e.source); }
+}
+
+function getIdList(ss) {
+  const idSheet = ss.getSheetByName("ID_LIST");
+  const logSheet = ss.getSheetByName("Log");
+  const groupSheet = ss.getSheetByName("GROUP_LIST");
+  if (!idSheet) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+
+  let groupMap = {};
+  if (groupSheet && groupSheet.getLastRow() > 1) {
+    const gData = groupSheet.getDataRange().getValues();
+    for (let i = 1; i < gData.length; i++) {
+      if (gData[i][0]) groupMap[String(gData[i][0]).trim()] = { ch: parseInt(gData[i][1]) || 0, auth: String(gData[i][2] || "KOKUFU_2026").trim() };
+    }
+  }
+
+  // ★ Logシートから最新の閾値（Dry, Full）をマッピングする
+  let thresholdMap = {};
+  if (logSheet) {
+    const logData = logSheet.getDataRange().getValues();
+    for (let i = 1; i < logData.length; i++) {
+      const fid = String(logData[i][1]).trim();
+      if (fid) thresholdMap[fid] = { dry: logData[i][13], full: logData[i][14] };
+    }
+  }
+
+  const lastRow = idSheet.getLastRow();
+  if (lastRow < 2) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+  const data = idSheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  let list = [];
+  for (let i = 0; i < data.length; i++) {
+    const fid = String(data[i][0]).trim();
+    if (fid !== "") {
+      const groupId = String(data[i][3]).trim() || "-";
+      let ch = 0; let auth = "KOKUFU_2026";
+      if (groupId !== "-" && groupId !== "" && groupMap[groupId] !== undefined) {
+        ch = groupMap[groupId].ch; auth = groupMap[groupId].auth;
+      }
+      
+      // ★ 閾値とモードをJSONに含める
+      const th = thresholdMap[fid] || { dry: 6.0, full: 10.0 };
+      list.push({
+        "id": fid, "ch": ch, "auth": auth,
+        "dry": th.dry !== "" ? th.dry : 6.0,
+        "full": th.full !== "" ? th.full : 10.0,
+        "mode": data[i][4] === "STOP" ? "STOP" : "RUN",
+        "offset": data[i][2] !== "" ? parseInt(data[i][2]) || 0 : 0
+      });
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify(list)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function syncIdListToNotification(ss) {
+  const idSheet = ss.getSheetByName("ID_LIST"); let notifSheet = ss.getSheetByName("NOTIFICATION");
+  if (!notifSheet) { notifSheet = ss.insertSheet("NOTIFICATION"); notifSheet.appendRow(["Field_ID", "Notify_GATE", "Notify_ALERT", "Notify_WARN", "Notify_COMM"]); }
+  const lastRowId = idSheet.getLastRow();
+  if (lastRowId < 2) return;
+  const idValues = idSheet.getRange(2, 1, lastRowId - 1, 1).getValues(); const lastRowNotif = notifSheet.getLastRow();
+  let notifIds = [];
+  if (lastRowNotif >= 2) { 
+    const notifValues = notifSheet.getRange(2, 1, lastRowNotif - 1, 1).getValues();
+    notifIds = notifValues.map(function(r){ return String(r[0]).trim(); }); 
+  }
+  const newRows = [];
+  for (let i = 0; i < idValues.length; i++) { 
+    const id = String(idValues[i][0]).trim();
+    if (id && id !== "" && notifIds.indexOf(id) === -1) { newRows.push([id, "ON", "ON", "ON", "ON"]); notifIds.push(id); } 
+  }
+  if (newRows.length > 0) notifSheet.getRange(lastRowNotif + 1, 1, newRows.length, 5).setValues(newRows);
+}
+
+function updateLastActiveTime(ss, id) {
+  const sheet = ss.getSheetByName("ID_LIST"); if (!sheet) return;
+  const data = sheet.getDataRange().getValues(); let targetRow = -1;
+  for (let i = 1; i < data.length; i++) { if (String(data[i][0]).trim() === String(id).trim()) { targetRow = i + 1; break; } }
+  if (targetRow !== -1) { 
+    sheet.getRange(targetRow, 6).setValue(new Date()).setNumberFormat('yyyy/MM/dd HH:mm:ss'); 
+    if (sheet.getRange(targetRow, 13).getValue() === "OFFLINE") sheet.getRange(targetRow, 13).setValue("NORMAL");
+  }
+}
+
+function getNotificationConfig(ss, id) {
+  let sheet = ss.getSheetByName("NOTIFICATION"); if (!sheet) return { gate: true, alert: true, warn: true, comm: true };
+  const data = sheet.getDataRange().getValues(); 
+  for (let i = 1; i < data.length; i++) { 
+    if (String(data[i][0]).trim() === String(id).trim()) return { gate: (data[i][1]!=="OFF"), alert: (data[i][2]!=="OFF"), warn: (data[i][3]!=="OFF"), comm: (data[i][4]!=="OFF") };
+  }
+  return { gate: true, alert: true, warn: true, comm: true };
+}
+
+function updateNotificationConfig(ss, id, type, val) {
+  if (!id || !type || !val) return "INVALID"; let sheet = ss.getSheetByName("NOTIFICATION");
+  const data = sheet.getDataRange().getValues(); let targetRow = -1; const newValue = (val.toUpperCase() === "OFF") ? "OFF" : "ON";
+  const typeKey = type.toUpperCase();
+  for (let i = 1; i < data.length; i++) { if (String(data[i][0]).trim() === String(id).trim()) { targetRow = i + 1; break; } }
+  if (targetRow === -1) { sheet.appendRow([id, "ON", "ON", "ON", "ON"]); targetRow = sheet.getLastRow(); }
+  let col = -1; if (typeKey === "GATE") col = 2;
+  else if (typeKey === "ALERT") col = 3; else if (typeKey === "WARN") col = 4;
+  else if (typeKey === "COMM") col = 5;
+  if (col !== -1) { sheet.getRange(targetRow, col).setValue(newValue); return "UPDATED:" + id; } return "INVALID";
+}
+
+function toggleFieldModeCmd(ss, id, currentVal) {
+  const idSheet = ss.getSheetByName("ID_LIST"); const data = idSheet.getDataRange().getValues();
+  let targetRow = -1;
+  for (let i = 1; i < data.length; i++) { if (String(data[i][0]).trim() === String(id).trim()) { targetRow = i + 1; break; } }
+  const nextMode = (currentVal === "RUN") ? "STOP" : "RUN"; if (targetRow !== -1) idSheet.getRange(targetRow, 5).setValue(nextMode);
+  return nextMode;
+}
+
+function setupSystemSheet(sheet) {
+  if (sheet.getRange("E1").isBlank()) sheet.getRange("E1").setValue(15);
+  const rule = SpreadsheetApp.newDataValidation().requireValueInList(["YES", "NO"], true).build(); sheet.getRange("E2").setDataValidation(rule);
+}
+
+function appendToDashboard(d, eLogStr = "") { 
+  if(!DASHBOARD_SS_ID) return;
+  try { 
+    let rowData = d.slice(); 
+    while(rowData.length < 15) { rowData.push(""); }
+    rowData[15] = eLogStr || ""; 
+    SpreadsheetApp.openById(DASHBOARD_SS_ID).getSheetByName("History").appendRow(rowData);
+  } catch(e) {} 
+}
+
+function applyCellFormatting(s,r,p,g12,pw,pg,ss,as){ 
+  try { 
+    s.getRange(r, 1).setNumberFormat('yyyy/MM/dd HH:mm:ss'); 
+    if(g12<=11.0) s.getRange(r,10).setBackground("#ffcccc"); else if(g12<=11.8) s.getRange(r,10).setBackground("#ffffcc");
+    if(pw<2.6 && pw>0) s.getRange(r,5).setBackground("#ffcccc"); if(pg<2.6 && pg>0) s.getRange(r,6).setBackground("#ffcccc"); 
+    if(ss==="ERROR") s.getRange(r,12).setBackground("#ffcccc"); if(as==="ACT_ERR") s.getRange(r,13).setBackground("#ffcccc"); 
+  } catch(e){}
+}
+
+function systemRun() { SpreadsheetApp.getActiveSpreadsheet().getSheetByName("SYSTEM").getRange("A1").setValue("RUN"); }
+function systemStop() { SpreadsheetApp.getActiveSpreadsheet().getSheetByName("SYSTEM").getRange("A1").setValue("STOP"); }
+
+function monitorCommunicationHeartbeat() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet(); const idSheet = ss.getSheetByName("ID_LIST"); const sysSheet = ss.getSheetByName("SYSTEM");
+  if (!idSheet || !sysSheet) return; if (sysSheet.getRange("A1").getValue() === "STOP" || sysSheet.getRange("B1").getValue() === "OFF") return;
+  const now = new Date();
+  const data = idSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const lastSeen = new Date(data[i][5]);
+    const id = data[i][0]; const currentStatus = data[i][12];
+    if (!id || String(id).trim() === "" || isNaN(lastSeen.getTime()) || data[i][4] === "STOP") continue;
+    const diffMinutes = (now - lastSeen) / (1000 * 60);
+    if (diffMinutes > 90) {
+      if (currentStatus === "OFFLINE") continue;
+      const conf = getNotificationConfig(ss, id);
+      if (conf.warn) sendMessagingApiPush("🚨 通信途絶\n圃場ID: " + id + "\n最終通信: " + Math.floor(diffMinutes) + "分前", id);
+      idSheet.getRange(i + 1, 13).setValue("OFFLINE");
+      const logSheet = ss.getSheetByName("Log");
+      if (logSheet) { 
+        let tr = -1;
+        const ld = logSheet.getDataRange().getValues();
+        for(let j=1; j<ld.length; j++){ if(String(ld[j][1]).trim() === String(id).trim()){ tr = j+1; break; } }
+        if(tr !== -1) { 
+            const prev = ld[tr - 1];
+            const lostRow = [ new Date(), id, prev[2], prev[3], prev[4], prev[5], "KEEP", "TIMEOUT", prev[8], prev[9], prev[10], prev[11], "COMM_LOST" ];
+            logSheet.getRange(tr, 1, 1, 13).setValues([lostRow]); 
+        }
+      }
+    }
+  }
+}
+
+function setupWatchdogTrigger() { 
+    const triggers = ScriptApp.getProjectTriggers();
+    for (let i = 0; i < triggers.length; i++) { if (triggers[i].getHandlerFunction() === "monitorCommunicationHeartbeat") ScriptApp.deleteTrigger(triggers[i]); } 
+    ScriptApp.newTrigger("monitorCommunicationHeartbeat").timeBased().everyHours(1).create();
+}
+function triggerManualSync() { syncIdListToNotification(SpreadsheetApp.getActiveSpreadsheet()); }
+function onOpen() { SpreadsheetApp.getUi().createMenu('⚙️ 設定').addItem('通信監視開始', 'setupWatchdogTrigger').addItem('初期シート作成', 'myFunction').addItem('同期', 'triggerManualSync').addToUi(); }
+function toggleSystemModeCmd(ss, currentMode) { const nextMode = (currentMode === "RUN") ? "STOP" : "RUN"; ss.getSheetByName("SYSTEM").getRange("A1").setValue(nextMode); return nextMode; }
+function toggleMasterNotifyCmd(ss, currentVal) { const nextVal = (currentVal === "ON") ? "OFF" : "ON"; ss.getSheetByName("SYSTEM").getRange("B1").setValue(nextVal); return nextVal; }
+
+function saveManualLogCmd(ss, id, opCmd, status, gate_12v, act_st, gate_v) {
+  let logSheet = ss.getSheetByName("Log");
+  if (!logSheet) {
+    logSheet = ss.insertSheet("Log");
+    logSheet.appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+  }
+  const data = logSheet.getDataRange().getValues(); let targetRow = -1;
+  for (let i = 1; i < data.length; i++) { if (String(data[i][1]).trim() === String(id).trim()) { targetRow = i + 1; break; } }
+  if (targetRow === -1) return; const now = new Date();
+  const g_status = (status === "SUCCESS") ? opCmd : "";
+  logSheet.getRange(targetRow, 1).setValue(now).setNumberFormat('yyyy/MM/dd HH:mm:ss'); logSheet.getRange(targetRow, 6).setValue(gate_v || "0.00");
+  logSheet.getRange(targetRow, 7).setValue(opCmd || ""); logSheet.getRange(targetRow, 8).setValue(status || "");
+  if (g_status) logSheet.getRange(targetRow, 9).setValue(g_status); logSheet.getRange(targetRow, 10).setValue(gate_12v || "0.00"); logSheet.getRange(targetRow, 13).setValue(act_st || "UNKNOWN");
+  updateLastActiveTime(ss, id); const prev = data[targetRow - 1]; const prevGStatus = g_status || prev[8];
+  appendToDashboard([ now, id, prev[2], prev[3], prev[4], gate_v || "0.00", opCmd, status, prevGStatus, gate_12v || "0.00", prev[10], prev[11], act_st || "UNKNOWN" ]);
+}
+
+function sendRemoteCmd(ss, id, cmd) {
+  let cmdSheet = ss.getSheetByName("REMOTE_CMD"); if (!cmdSheet) { cmdSheet = ss.insertSheet("REMOTE_CMD"); cmdSheet.appendRow(["Field_ID", "Command", "Status", "Timestamp"]); }
+  cmdSheet.appendRow([id, cmd, "PENDING", new Date()]); cmdSheet.getRange(cmdSheet.getLastRow(), 4).setNumberFormat('yyyy/MM/dd HH:mm:ss'); return "OK";
+}
+
+function saveGroupConfigCmd(ss, groupName, ch, auth) {
+  if (!groupName || groupName === "-" || groupName === "_NEW_") return;
+  let groupSheet = ss.getSheetByName("GROUP_LIST");
+  if (!groupSheet) { groupSheet = ss.insertSheet("GROUP_LIST"); groupSheet.appendRow(["GroupName", "Channel", "AUTH_KEY"]); }
+  const gData = groupSheet.getDataRange().getValues();
+  let gRow = -1;
+  for (let i = 1; i < gData.length; i++) { if (String(gData[i][0]).trim() === String(groupName).trim()) { gRow = i + 1; break; } }
+  // ★ ガード処理: ch/auth が有効な値の場合のみ書き込む。空欄送信で既存値を消さない。
+  const isChValid   = (ch   !== undefined && ch   !== null && String(ch).trim()   !== "");
+  const isAuthValid = (auth !== undefined && auth !== null && String(auth).trim() !== "");
+  if (gRow !== -1) {
+    if (isChValid)   groupSheet.getRange(gRow, 2).setValue(parseInt(ch) || 0);
+    if (isAuthValid) groupSheet.getRange(gRow, 3).setValue(String(auth).trim());
+  } else {
+    groupSheet.appendRow([groupName, isChValid ? (parseInt(ch) || 0) : 0, isAuthValid ? String(auth).trim() : ""]);
+  }
+}
+
+function saveFieldConfigCmd(ss, id, dry, full, offset, mode, groupName, ch) {
+  let logSheet = ss.getSheetByName("Log");
+  if (!logSheet) {
+    logSheet = ss.insertSheet("Log");
+    logSheet.appendRow(["日時", "Field_ID", "Volt", "Level", "Pico_V", "Gate_V", "Gate_Cmd", "Status", "G_Status", "Gate_12V", "RSSI", "S_Err", "Act_St", "Dry", "Full"]);
+  }
+  // ★ ガード処理: dry/full はupdateLogSheetThreshold内でも検証するが、
+  //   呼び出し前に有効チェックして不要な書き込みを抑制する。
+  updateLogSheetThreshold(logSheet, id, dry, full);
+  
+  let idSheet = ss.getSheetByName("ID_LIST");
+  if (!idSheet) {
+    idSheet = ss.insertSheet("ID_LIST");
+    idSheet.appendRow(["Field_ID", "表示名", "送信オフセット", "グループ", "稼働モード", "最終通信", "", "", "", "", "", "", "通信状態"]);
+  }
+  
+  const idData = idSheet.getDataRange().getValues();
+  let idRow = -1;
+  for (let i = 1; i < idData.length; i++) { if (String(idData[i][0]).trim() === String(id).trim()) { idRow = i + 1; break; } }
+  if (idRow !== -1) {
+    // ★ ガード処理: 各フィールドが有効な値を持つ場合のみ書き込む。
+    //   空欄・null・undefined が送られてきた場合は既存セルを保持し設定値の消失を防ぐ。
+    //   （例: setup_gate.htmlからの同期では dry/full/groupName 等が送られないため、
+    //     ガードなしでは該当セルが空欄で上書きされてしまう）
+    const isOffsetValid = (offset !== undefined && offset !== null && String(offset).trim() !== "");
+    const isGroupValid  = (groupName !== undefined && groupName !== null && String(groupName).trim() !== "" && groupName !== "-");
+    const isModeValid   = (mode === "RUN" || mode === "STOP");
+    if (isOffsetValid) idSheet.getRange(idRow, 3).setValue(parseInt(offset) || 0);
+    if (isGroupValid)  idSheet.getRange(idRow, 4).setValue(groupName);
+    if (isModeValid)   idSheet.getRange(idRow, 5).setValue(mode);
+  }
+  return "OK";
+}
