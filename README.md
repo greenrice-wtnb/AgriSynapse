@@ -53,15 +53,15 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
    * デフォルトの`センサーノード用コード.py`では、10分毎にセンサー計測を行い、DATAパケットで、超音波測距センサーで計測した水位(water_level)と、
    自身に保存された閾値とそれを照らし合わせたパーセンテージ(level_pct)を、30分毎にゲートウェイに向けて送信していますが、この2種類の変数に、それぞれ別々のセンサーから取得した値を割り当てることが可能です。
    * ゲートウェイ・GAS共に、センサーノードから送られてきた数値をただ受け取って、適切に格納・記録しているだけで、**それが何の数値なのか**を判別する機能はありません。よって、GASにおける各数値の単位や通知内容、閾値の設定を任意に変更しても、不用意にコードを改変しない限りは、各ノード間の通信における数値の取り扱いに影響はありません。
-   * センサーノードに搭載するセンサーの種類を増設し、送信するデータの種類や閾値判定機能、それに合わせた通知機能を増やしたい場合は、センサーノードが送信する`DATA`パケットの構造や、ゲートウェイノードがそれを受けて管理用GASにリレーする際のJSONデータの構造、および、管理用GASが受け取ったデータを対応する各セルに正しく格納できるようすること、管理用ダッシュボードの各カードに正しく各データが表示されるようにすること等に配慮してコードの改変を行ってください。特に、管理用GASの後方互換性の維持に努めてください。
+   * センサーノードに搭載するセンサーの種類を増設し、送信するデータの種類や閾値判定機能、それに合わせた通知機能を増やしたい場合は、センサーノードが送信する`DATA`パケットの構造や、ゲートウェイノードがそれを受けて管理用GASにリレーする際のJSONデータの構造、および、管理用GASが受け取ったデータを対応する各セルに正しく格納できるように注意することや、管理用ダッシュボードの各カードに正しく各データが表示されるようにすること等に配慮してコードの改変を行ってください。特に、管理用GASの後方互換性の維持に努めてください。
 
 *  **アクチュエーターノード**について、`Type-R-O`と`Type-R-P`の2種類の動作用コードを設定しています。
-   末尾が「‐O」のPythonコードは、ON制御版のコードであり、「‐P」のコードはパルス制御版のコードとなっています。
+   末尾が「‐O」のPythonコードは、ラッチ制御版のコードであり、「‐P」のコードはパルス制御版のコードとなっています。
    デフォルトの動作としては、
-   * `Type-R-O` では、`OPEN`指示の`COMMAND`パケットを受信した場合、次回以降の`COMMAND`パケットで`CLOSE`指示を受信するまでの間、リレーの状態を保持します。
-   逆の場合も同様です.
-   * `Type-R-P` では、`COMMAND`パケットで`OPEM`または`CLOSE`の指示を受信した場合、それぞれの指示に対して、設定されたリレーのチャンネルを20秒間ONにし、
-   その後OFFにします。
+   * `Type-R-O` では、`OPEN`指示の`COMMAND`パケットを受信した場合、次回以降の`COMMAND`パケットで`CLOSE`指示を受信するまでの間、対応するリレーの状態を保持します。逆の場合も同様です。
+   * `Type-R-O` では、ラッチ制御により、リレーの状態保持をし続けることで消費電力が大きくなるのを避けるために、容量の大きいフォトリレー**TLP3553A**をアクチュエーターやモーターポンプの制御に使用し、**TLP3553A**のON/OFFをGP27からラッチ制御するコードになっています。
+   * 動作電圧や使用電力の大きい負荷を動作させる際は、必ず負荷駆動専用の別電源を用意し、安全のために電磁接触器を介して制御してください。その場合、サージによる故障や不具合に注意してください。サージキラーの使用を推奨します。
+   * `Type-R-P` では、`COMMAND`パケットで`OPEM`または`CLOSE`の指示を受信した場合、それぞれの指示に対して、設定されたリレーのチャンネルを20秒間ONにし、その後OFFにします。
 
 *  **稼働モード**について
    センサーノードとアクチュエーターノードは、GASにデプロイした`管理用GASスクリプト`や、Cloudflare Pagesにデプロイした`dashboard`上から、
@@ -149,11 +149,12 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
    * If you wish to add more types of sensors to the sensor node, increase the types of data sent, the threshold judgment functions, and their corresponding notification functions, please modify the code with consideration for the structure of the `DATA` packet sent by the sensor node, the structure of the JSON data when the gateway node receives and relays it to the management GAS, ensuring that the management GAS can correctly store the received data in the corresponding cells, and ensuring that each data is correctly displayed on each card of the management dashboard. In particular, please strive to maintain backward compatibility with the management GAS.
 
 *  Regarding the **Actuator Node**, two types of operational codes, `Type-R-O` and `Type-R-P`, are provided.
-   The Python code ending with "-O" is the ON-control version code, and the code ending with "-P" is the pulse-control version code.
+   The Python code ending with "-O" is the latch-control version code, and the code ending with "-P" is the pulse-control version code.
    As for the default behavior:
-   * In `Type-R-O`, when a `COMMAND` packet with an `OPEN` instruction is received, it retains the relay state until a `CLOSE` instruction is received in a subsequent `COMMAND` packet.
-   The reverse case is also the same.
-   * In `Type-R-P`, when an `OPEM` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction,
+   * In `Type-R-O`, when a `COMMAND` packet with an `OPEN` instruction is received, it retains the relay state until a `CLOSE` instruction is received in a subsequent `COMMAND` packet. The reverse case is also the same.
+   * In `Type-R-O`, to avoid the increased power consumption caused by continuously maintaining the relay state, a high-capacity photo relay **TLP3553A** is used to control the actuator, and the code is designed to perform latch control of the **TLP3553A**'s ON/OFF via GP27.
+   * When operating a load with a high operating voltage or large power consumption, be sure to prepare a separate power supply dedicated to driving the load, and control it via a magnetic contactor for safety. In such cases, please be careful of failures or malfunctions caused by power surges. The use of a surge suppressor is recommended.
+   * In `Type-R-P`, when an `OPEN` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction,
    and then turned OFF.
 
 *  Regarding **Operation Mode**
