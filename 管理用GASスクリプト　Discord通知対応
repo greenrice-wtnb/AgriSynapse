@@ -463,7 +463,7 @@ function processNodeData(ss, p, globalMode, masterNotify, bulkAlerts = null) {
   const prevLevel = prevRow ? parseFloat(prevRow[3]) : null;
   /*
    * ★ prevLevel(Row[3])の前回値参照はデフォルトのコード内では使用されませんが、将来的にRow[3]に別途センサーの値を割り当て、
-　 * 通知を設定する場合に必要になります。将来的拡張のために残しています。
+　 * 判定や通知を設定する場合に必要になります。将来的拡張のために残しています。
    */
 
    
