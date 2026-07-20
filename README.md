@@ -53,6 +53,7 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
    * デフォルトの`センサーノード用コード.py`では、10分毎にセンサー計測を行い、DATAパケットで、超音波測距センサーで計測した水位(water_level)と、
    自身に保存された閾値とそれを照らし合わせたパーセンテージ(level_pct)を、30分毎にゲートウェイに向けて送信していますが、この2種類の変数に、それぞれ別々のセンサーから取得した値を割り当てることが可能です。
    * ゲートウェイ・GAS共に、センサーノードから送られてきた数値をただ受け取って、適切に格納・記録しているだけで、**それが何の数値なのか**を判別する機能はありません。よって、GASにおける各数値の単位や通知内容、閾値の設定を任意に変更しても、不用意にコードを改変しない限りは、各ノード間の通信における数値の取り扱いに影響はありません。
+   * センサーノードに搭載するセンサーの種類を増設し、送信するデータの種類や閾値判定機能、それに合わせた通知機能を増やしたい場合は、センサーノードが送信する`DATA`パケットの構造や、ゲートウェイノードがそれを受けて管理用GASにリレーする際のJSONデータの構造、および、管理用GASが受け取ったデータを対応する各セルに正しく格納できるようすること、管理用ダッシュボードの各カードに正しく各データが表示されるようにすること等に配慮してコードの改変を行ってください。特に、管理用GASの後方互換性の維持に努めてください。
 
 *  **アクチュエーターノード**について、`Type-R-O`と`Type-R-P`の2種類の動作用コードを設定しています。
    末尾が「‐O」のPythonコードは、ON制御版のコードであり、「‐P」のコードはパルス制御版のコードとなっています。
@@ -140,6 +141,41 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
    Assemble the sensor and actuator nodes. Upon power-up, they boot in AP mode. Access `192.168.4.1` from a smartphone to set node IDs, LoRa channels, TDMA offset values, etc.
 5. **On-site Installation & Calibration**
    After installing the system in the field, use the smart controller in the actual environment to calibrate the sensors (setting the reference values).
+
+### Supplementary Notes
+*  The **Sensor Node** can control and measure multiple types of sensors simultaneously, but by default, it can only send two types of measurement data to the gateway.
+   * In the default `センサーノード用コード.py`, sensor measurements are taken every 10 minutes, and the water level measured by the ultrasonic distance sensor (water_level) and the percentage calculated against its internally saved threshold (level_pct) are sent to the gateway every 30 minutes via a `DATA` packet. It is possible to assign values obtained from different sensors to these two types of variables.
+   * Both the gateway and GAS simply receive the numerical values sent from the sensor node and appropriately store and record them; they do not have a function to determine **what the values represent**. Therefore, even if you arbitrarily change the units of each value, notification contents, or threshold settings in GAS, it will not affect the handling of numerical values in the communication between nodes, as long as the code is not carelessly modified.
+   * If you wish to add more types of sensors to the sensor node, increase the types of data sent, the threshold judgment functions, and their corresponding notification functions, please modify the code with consideration for the structure of the `DATA` packet sent by the sensor node, the structure of the JSON data when the gateway node receives and relays it to the management GAS, ensuring that the management GAS can correctly store the received data in the corresponding cells, and ensuring that each data is correctly displayed on each card of the management dashboard. In particular, please strive to maintain backward compatibility with the management GAS.
+
+*  Regarding the **Actuator Node**, two types of operational codes, `Type-R-O` and `Type-R-P`, are provided.
+   The Python code ending with "-O" is the ON-control version code, and the code ending with "-P" is the pulse-control version code.
+   As for the default behavior:
+   * In `Type-R-O`, when a `COMMAND` packet with an `OPEN` instruction is received, it retains the relay state until a `CLOSE` instruction is received in a subsequent `COMMAND` packet.
+   The reverse case is also the same.
+   * In `Type-R-P`, when an `OPEM` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction,
+   and then turned OFF.
+
+*  Regarding **Operation Mode**
+   The sensor node and actuator node can have their operation mode set to `RUN` or `STOP` from the `管理用GASスクリプト` deployed on GAS or the `dashboard` deployed on Cloudflare Pages.
+   
+   * When the **Sensor Node** is set to `STOP` mode
+     The communication control, which is the core of the system, stops.
+     * The threshold judgment function and the transmission of `COMMAND` packets to the actuator node will stop.
+     * The authority for threshold judgment is delegated to the management GAS, and if the threshold is exceeded upwards or downwards, the administrator is notified via Discord.
+     * Sensor measurements every 10 minutes and the transmission of `DATA` packets to the gateway every 30 minutes will continue to be executed.
+       
+   * When the **Actuator Node** is set to `STOP` mode
+     This is used as a **safety lock** during **actuator maintenance** to prevent accidents such as pinched fingers due to unexpected automatic operation.
+     * It rejects operation instructions via `COMMAND` packets from the sensor node.
+     * Only operations via the `MANUAL` command from the smart controller are treated as test commands during maintenance, and are received and executed.
+   * When the **Repeater Node** is set to `STOP` mode
+     The STOP mode of the repeater node is used to reduce congestion in the radio wave space (unnecessary communication) when the target field enters the off-season and radio wave relaying is no longer necessary.
+     * Suspension of relay function: Even if data is received from child devices (sensor node/actuator node), packet forwarding (repeating) to the parent device (gateway) will completely stop.
+     * Continuation of keep-alive monitoring only: Although the relay function stops, only the "self-report" communication, which sends information on whether the repeater itself is alive (battery voltage, etc.) to the gateway,
+     will continue to be sent according to the set offset time.
+  * The **Gateway Node** does not have an operation mode change function.
+  * By clicking the operation mode button in the header of the management dashboard ( `dashboard` ), you can batch change the operation modes of the sensor nodes in all fields where the system is installed. Additionally, you can change the operation mode of the sensor node on a field-by-field basis using the operation mode change button at the top of each field ID card on the management dashboard.
 
 ## ⚠️ Disclaimer
 
