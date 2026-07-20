@@ -59,10 +59,14 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
    末尾が「‐O」のPythonコードは、ラッチ制御版のコードであり、「‐P」のコードはパルス制御版のコードとなっています。
    デフォルトの動作としては、
    * `Type-R-O` では、`OPEN`指示の`COMMAND`パケットを受信した場合、次回以降の`COMMAND`パケットで`CLOSE`指示を受信するまでの間、対応するリレーの状態を保持します。逆の場合も同様です。
-   * `Type-R-O` では、ラッチ制御により、リレーの状態保持をし続けることで消費電力が大きくなるのを避けるために、容量の大きいフォトリレー**TLP3553A**をアクチュエーターやモーターポンプの制御に使用し、**TLP3553A**のON/OFFをGP27からラッチ制御するコードになっています。
-   * 動作電圧や使用電力の大きい負荷を動作させる際は、必ず負荷駆動専用の別電源を用意し、安全のために電磁接触器を介して制御してください。その場合、サージによる故障や不具合に注意してください。サージキラーの使用を推奨します。
-   * 加えて、`Type-R-O` では、水路から水を田んぼに給水する動作などを想定し、水路の水がなくなってモーターポンプが空焚き状態になることを防ぐ目的で、GP22の状態を監視するように設定されています。GP22とGNDをフロートスイッチ等を通して接続し、GP22が`High`の状態では、「水路に水がない」と判断して`ACT_ERR`状態となり、パケットの種類に関係なく一切の負荷駆動指示を拒否します。
    * `Type-R-P` では、`COMMAND`パケットで`OPEM`または`CLOSE`の指示を受信した場合、それぞれの指示に対して、設定されたリレーのチャンネルを20秒間ONにし、その後OFFにします。
+   
+   * `Type-R-O` では、ラッチ制御により、リレーの状態保持をし続けることで消費電力が大きくなるのを避けるために、容量の大きいフォトリレー**TLP3553A**をアクチュエーターやモーターポンプの制御に使用し、**TLP3553A**のON/OFFをGP27からラッチ制御するコードになっています。
+   * 加えて、`Type-R-O` では、水路から水を田んぼに給水する動作などを想定し、水路の水がなくなってモーターポンプが空焚き状態になることを防ぐ目的で、GP22の状態を監視するように設定されています。GP22とGNDをフロートスイッチ等を通して接続し、GP22が`High`の状態では、「水路に水がない」と判断して`ACT_ERR`状態となり、パケットの種類に関係なく一切の負荷駆動指示を拒否します。
+   * 動作電圧や使用電力の大きい負荷を動作させる際は、必ず負荷駆動専用の別電源を用意し、安全のために電磁接触器を介して制御してください。その場合、サージによる故障や不具合に注意してください。サージキラーの使用を推奨します。
+   * `Type-R-P`では、負荷駆動中の電源電圧を常に監視し、急激な電圧低下が検出された際は即座に負荷駆動を停止する安全機能が搭載されています。デフォルトでは12V鉛蓄電池電源を想定しているため、動作停止電圧などの設定値は必要に応じて変更してください。
+   
+  
 
 *  **稼働モード**について
    センサーノードとアクチュエーターノードは、GASにデプロイした`管理用GASスクリプト`や、Cloudflare Pagesにデプロイした`dashboard`上から、
@@ -153,11 +157,11 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
    The Python code ending with "-O" is the latch-control version code, and the code ending with "-P" is the pulse-control version code.
    As for the default behavior:
    * In `Type-R-O`, when a `COMMAND` packet with an `OPEN` instruction is received, it retains the relay state until a `CLOSE` instruction is received in a subsequent `COMMAND` packet. The reverse case is also the same.
+   * In `Type-R-P`, when an `OPEN` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction, and then turned OFF.
    * In `Type-R-O`, to avoid the increased power consumption caused by continuously maintaining the relay state, a high-capacity photo relay **TLP3553A** is used to control the actuator, and the code is designed to perform latch control of the **TLP3553A**'s ON/OFF via GP27.
-   * When operating a load with a high operating voltage or large power consumption, be sure to prepare a separate power supply dedicated to driving the load, and control it via a magnetic contactor for safety. In such cases, please be careful of failures or malfunctions caused by power surges. The use of a surge suppressor is recommended.
    * Additionally, in `Type-R-O`, assuming operations such as supplying water from a canal to a rice paddy, it is configured to monitor the state of GP22 to prevent the motor pump from running dry if the canal runs out of water. By connecting GP22 and GND through a float switch or similar device, when GP22 is in a `High` state, it determines that "there is no water in the canal," enters the `ACT_ERR` state, and rejects all load driving instructions regardless of the packet type.
-   * In `Type-R-P`, when an `OPEN` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction,
-   and then turned OFF.
+   * When operating a load with a high operating voltage or large power consumption, be sure to prepare a separate power supply dedicated to driving the load, and control it via a magnetic contactor for safety. In such cases, please be careful of failures or malfunctions caused by power surges. The use of a surge suppressor is recommended.
+   * In `Type-R-P`, a safety feature is implemented that constantly monitors the power supply voltage while driving the load and immediately stops the load operation if a sudden voltage drop is detected. Since a 12V lead-acid battery power supply is assumed by default, please adjust the setting values, such as the operation stop voltage, as necessary.
 
 *  Regarding **Operation Mode**
    The sensor node and actuator node can have their operation mode set to `RUN` or `STOP` from the `管理用GASスクリプト` deployed on GAS or the `dashboard` deployed on Cloudflare Pages.
