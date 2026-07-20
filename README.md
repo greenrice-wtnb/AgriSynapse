@@ -50,8 +50,8 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
 
 ### 補足事項
 *  **センサーノード**は、複数種類のセンサーを同時に制御・計測できますが、ゲートウェイに送信できる計測データは、デフォルトでは2種類です。
-   * デフォルトの`センサーノード用コード.py`では、10分毎にセンサー計測を行い、DATAパケットで、超音波測距センサーで計測した水位(water_level)と、
-   自身に保存された閾値とそれを照らし合わせたパーセンテージ(level_pct)を、30分毎にゲートウェイに向けて送信していますが、この2種類の変数に、それぞれ別々のセンサーから取得した値を割り当てることが可能です。
+   * デフォルトの`センサーノード用コード.py`では、10分毎にセンサー計測を行い、DATAパケットで、「超音波測距センサーで計測した水位(water_level)」と、
+   「自身に保存された閾値とそれを照らし合わせたパーセンテージ(level_pct)」を、30分毎にゲートウェイに向けて送信していますが、この2種類の変数に、それぞれ別々のセンサーから取得した値を割り当てることが可能です。
    * ゲートウェイ・GAS共に、センサーノードから送られてきた数値をただ受け取って、適切に格納・記録しているだけで、**それが何の数値なのか**を判別する機能はありません。よって、GASにおける各数値の単位や通知内容、閾値の設定を任意に変更しても、不用意にコードを改変しない限りは、各ノード間の通信における数値の取り扱いに影響はありません。
    * センサーノードに搭載するセンサーの種類を増設し、送信するデータの種類や閾値判定機能、それに合わせた通知機能を増やしたい場合は、センサーノードが送信する`DATA`パケットの構造や、ゲートウェイノードがそれを受けて管理用GASにリレーする際のJSONデータの構造、および、管理用GASが受け取ったデータを対応する各セルに正しく格納できるように注意することや、管理用ダッシュボードの各カードに正しく各データが表示されるようにすること等に配慮してコードの改変を行ってください。特に、管理用GASの後方互換性の維持に努めてください。
 
@@ -144,7 +144,7 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
 
 ### Supplementary Notes
 *  The **Sensor Node** can control and measure multiple types of sensors simultaneously, but by default, it can only send two types of measurement data to the gateway.
-   * In the default `センサーノード用コード.py`, sensor measurements are taken every 10 minutes, and the water level measured by the ultrasonic distance sensor (water_level) and the percentage calculated against its internally saved threshold (level_pct) are sent to the gateway every 30 minutes via a `DATA` packet. It is possible to assign values obtained from different sensors to these two types of variables.
+   * In the default `センサーノード用コード.py`, sensor measurements are taken every 10 minutes, and ''the water level measured by the ultrasonic distance sensor (water_level)'' and ''the percentage calculated against its internally saved threshold (level_pct)'' are sent to the gateway every 30 minutes via a `DATA` packet. It is possible to assign values obtained from different sensors to these two types of variables.
    * Both the gateway and GAS simply receive the numerical values sent from the sensor node and appropriately store and record them; they do not have a function to determine **what the values represent**. Therefore, even if you arbitrarily change the units of each value, notification contents, or threshold settings in GAS, it will not affect the handling of numerical values in the communication between nodes, as long as the code is not carelessly modified.
    * If you wish to add more types of sensors to the sensor node, increase the types of data sent, the threshold judgment functions, and their corresponding notification functions, please modify the code with consideration for the structure of the `DATA` packet sent by the sensor node, the structure of the JSON data when the gateway node receives and relays it to the management GAS, ensuring that the management GAS can correctly store the received data in the corresponding cells, and ensuring that each data is correctly displayed on each card of the management dashboard. In particular, please strive to maintain backward compatibility with the management GAS.
 
