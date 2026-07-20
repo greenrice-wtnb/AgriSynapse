@@ -61,6 +61,7 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
    * `Type-R-O` では、`OPEN`指示の`COMMAND`パケットを受信した場合、次回以降の`COMMAND`パケットで`CLOSE`指示を受信するまでの間、対応するリレーの状態を保持します。逆の場合も同様です。
    * `Type-R-O` では、ラッチ制御により、リレーの状態保持をし続けることで消費電力が大きくなるのを避けるために、容量の大きいフォトリレー**TLP3553A**をアクチュエーターやモーターポンプの制御に使用し、**TLP3553A**のON/OFFをGP27からラッチ制御するコードになっています。
    * 動作電圧や使用電力の大きい負荷を動作させる際は、必ず負荷駆動専用の別電源を用意し、安全のために電磁接触器を介して制御してください。その場合、サージによる故障や不具合に注意してください。サージキラーの使用を推奨します。
+   * 加えて、`Type-R-O` では、水路から水を田んぼに給水する動作などを想定し、水路の水がなくなってモーターポンプが空焚き状態になることを防ぐ目的で、GP22の状態を監視するように設定されています。GP22とGNDをフロートスイッチ等を通して接続し、GP22が`High`の状態では、「水路に水がない」と判断して`ACT_ERR`状態となり、パケットの種類に関係なく一切の負荷駆動指示を拒否します。
    * `Type-R-P` では、`COMMAND`パケットで`OPEM`または`CLOSE`の指示を受信した場合、それぞれの指示に対して、設定されたリレーのチャンネルを20秒間ONにし、その後OFFにします。
 
 *  **稼働モード**について
@@ -76,7 +77,7 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
    * **アクチュエーターノード**を`STOP`モードに設定した場合: 
      **アクチュエーターのメンテナンス時**に、予期せぬ自動作動で指を挟むなどの事故を防ぐための**安全ロック**として使用します。
      * センサーノードからの`COMMAND`パケットによる操作指示を拒否します。
-     * スマートコントローラーからの`MANUAL`コマンドによる操作のみ、メンテナンス時のテストコマンドとして扱い、受信して動作します。
+     * スマートコントローラーまたはゲートウェイノードからの`MANUAL`コマンドによる操作のみ、メンテナンス時のテストコマンドとして扱い、受信して動作します。
    * **リピーターノード**を`STOP`モードに設定した場合: 
      リピーターノードのSTOPモードは、対象の圃場がシーズンオフに入り、電波の中継が不要になった際に、電波空間の混雑（不要な通信）を減らすために使用します。
      * 中継機能の停止: 子機（センサーノード・アクチュエーターノード）からデータを受信しても、親機（ゲートウェイ）へのパケット転送（リピート）を一切行わなくなります。
@@ -154,6 +155,7 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
    * In `Type-R-O`, when a `COMMAND` packet with an `OPEN` instruction is received, it retains the relay state until a `CLOSE` instruction is received in a subsequent `COMMAND` packet. The reverse case is also the same.
    * In `Type-R-O`, to avoid the increased power consumption caused by continuously maintaining the relay state, a high-capacity photo relay **TLP3553A** is used to control the actuator, and the code is designed to perform latch control of the **TLP3553A**'s ON/OFF via GP27.
    * When operating a load with a high operating voltage or large power consumption, be sure to prepare a separate power supply dedicated to driving the load, and control it via a magnetic contactor for safety. In such cases, please be careful of failures or malfunctions caused by power surges. The use of a surge suppressor is recommended.
+   * Additionally, in `Type-R-O`, assuming operations such as supplying water from a canal to a rice paddy, it is configured to monitor the state of GP22 to prevent the motor pump from running dry if the canal runs out of water. By connecting GP22 and GND through a float switch or similar device, when GP22 is in a `High` state, it determines that "there is no water in the canal," enters the `ACT_ERR` state, and rejects all load driving instructions regardless of the packet type.
    * In `Type-R-P`, when an `OPEN` or `CLOSE` instruction is received via a `COMMAND` packet, the configured relay channel is turned ON for 20 seconds for each respective instruction,
    and then turned OFF.
 
@@ -169,7 +171,7 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
    * When the **Actuator Node** is set to `STOP` mode
      This is used as a **safety lock** during **actuator maintenance** to prevent accidents such as pinched fingers due to unexpected automatic operation.
      * It rejects operation instructions via `COMMAND` packets from the sensor node.
-     * Only operations via the `MANUAL` command from the smart controller are treated as test commands during maintenance, and are received and executed.
+     * Only operations via the `MANUAL` command from the smart-controller and the gateway node are treated as test commands during maintenance, and are received and executed.
    * When the **Repeater Node** is set to `STOP` mode
      The STOP mode of the repeater node is used to reduce congestion in the radio wave space (unnecessary communication) when the target field enters the off-season and radio wave relaying is no longer necessary.
      * Suspension of relay function: Even if data is received from child devices (sensor node/actuator node), packet forwarding (repeating) to the parent device (gateway) will completely stop.
