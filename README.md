@@ -90,6 +90,17 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
   * **ゲートウェイノード**には、稼働モードの変更機能はありません。
   * 管理用ダッシュボード( `dashboard` )のヘッダーにある稼働モードボタンをクリックすることで、システムを設置した全圃場にあるセンサーノードの稼働モードを、一括で変更することが可能です。また、管理用ダッシュボードの各圃場IDのカード上部にある稼働モード変更ボタンで、圃場別にセンサーノードの稼働モードを変更することが可能です。
 
+### 想定される使用例
+* **AgriSynapse**の使用例としては、デフォルトの水田水位自動管理システムとしての使用の他、以下の用途が想定されます。このほかにも、自由な発想で様々な拡張性を持たせることができます。
+
+    * ソーラーパネルの発電電圧や土壌水分から、日商の強さや土壌の乾燥具合を判断し、作物に自動で灌水するシステム
+    * 気温と湿度、CO2濃度を計測し、水蒸気圧差を自動計算して、栽培施設の環境制御を行うシステム
+    * 温度センサーと加速度センサーを搭載し、体温と行動量を計測することで、家畜の健康状態を把握し、厩舎設備と連動するシステム
+    * 害獣駆除の罠と連動させ、害獣が罠にかかったら通知するシステム
+    * 圃場や倉庫・工場の出入り口等に設置し、人感センサーなどと接続して、監視カメラ以外の手段で管理時間外の人の出入りを監視する簡易防犯システム
+
+等
+
 ## ⚠️ 免責事項 (Disclaimer)
 
 本システムはオープンソースとして無償で公開されています。
@@ -183,6 +194,17 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
      will continue to be sent according to the set offset time.
   * The **Gateway Node** does not have an operation mode change function.
   * By clicking the operation mode button in the header of the management dashboard ( `dashboard` ), you can batch change the operation modes of the sensor nodes in all fields where the system is installed. Additionally, you can change the operation mode of the sensor node on a field-by-field basis using the operation mode change button at the top of each field ID card on the management dashboard.
+
+### Expected Use Cases
+* In addition to its default use as an automated paddy field water level management system, the following use cases are anticipated for **AgriSynapse**. Beyond these, various expansions can be implemented based on your own creative ideas.
+
+    * A system that automatically irrigates crops by determining the strength of sunlight and the dryness of the soil based on the solar panel's generated voltage and soil moisture.
+    * A system that measures temperature, humidity, and CO2 concentration, automatically calculates the vapor pressure deficit (VPD), and performs environmental control for cultivation facilities.
+    * A system equipped with temperature and acceleration sensors to monitor the health status of livestock by measuring body temperature and activity levels, linked with stable equipment.
+    * A system linked with pest control traps that sends a notification when a pest is caught in the trap.
+    * A simple security system installed at the entrances and exits of fields, warehouses, or factories, connected to motion sensors, etc., to monitor people entering and exiting outside of management hours using means other than surveillance cameras.
+
+etc.
 
 ## ⚠️ Disclaimer
 
