@@ -37,12 +37,14 @@ AgriSynapseは、以下の複数のハードウェアノードとクラウドシ
 
 ### 大まかな導入ステップ
 1. **クラウドの準備**
-   Googleスプレッドシートを作成し、付属のGASスクリプト(`管理用GASスクリプト...txt`)をデプロイします。また、CloudflarePagesでWebアプリ用HTMLを設定・デプロイします。Cloudflare Workersを用いたリダイレクト追従プロキシも設定します。
-2. **ゲートウェイのセットアップ**
+   Googleスプレッドシートを作成し、付属のGASスクリプト(`管理用GASスクリプト...txt`)をデプロイします。
+   管理用GASスクリプト内のMyFunction()関数を、GoogleAppsScriptのエディター内から指定して実行することで、動作に必要な全シートの作成が自動で行われます。
+   また、Cloudflare PagesでWebアプリ用HTMLを設定・デプロイします。Cloudflare Workersを用いたリダイレクト追従プロキシも設定します。
+3. **ゲートウェイのセットアップ**
    Raspberry Pi Pico(LTE-M版) またはPico W(Wi‐Fi版)にコードを書き込み、LTE-MまたはWi‐Fi経由でGASと通信できるように設定します。
-3. **ノードの組み立てと初期設定**
+4. **ノードの組み立てと初期設定**
    センサーノード、アクチュエーターノードを組み立てます。電源投入時にAPモードで起動するため、スマホから `192.168.4.1` にアクセスし、ノードIDやLoRaチャンネル、TDMA用オフセット値などを設定します。
-4. **現地設置とキャリブレーション**
+5. **現地設置とキャリブレーション**
    現地圃場に設置後、スマートコントローラーを使用して実際の環境でセンサーのキャリブレーション（基準値の設定）を行います。
 
 ## ⚠️ 免責事項 (Disclaimer)
@@ -92,12 +94,14 @@ For detailed setup instructions, wiring diagrams, and parts lists, please refer 
 
 ### Basic Setup Steps
 1. **Cloud Preparation**
-   Create a Google Sheet and deploy the provided GAS scripts (`管理用GASスクリプト...txt`). Also, configure and deploy the Web App HTML via Cloudflare Pages. Set up a redirect-following proxy using Cloudflare Workers.
-2. **Gateway Setup**
+   Create a Google Sheet and deploy the provided GAS scripts (`管理用GASスクリプト...txt`).
+   By selecting and running the MyFunction() function from within the Google Apps Script editor, all the sheets necessary for operation will be created automatically.
+   Also, configure and deploy the Web App HTML via Cloudflare Pages. Set up a redirect-following proxy using Cloudflare Workers.
+3. **Gateway Setup**
    Flash the code to a Raspberry Pi Pico (LTE-M version) or Pico W (Wi-Fi version) and configure it to communicate with GAS via LTE-M or Wi-Fi.
-3. **Node Assembly & Initial Setup**
+4. **Node Assembly & Initial Setup**
    Assemble the sensor and actuator nodes. Upon power-up, they boot in AP mode. Access `192.168.4.1` from a smartphone to set node IDs, LoRa channels, TDMA offset values, etc.
-4. **On-site Installation & Calibration**
+5. **On-site Installation & Calibration**
    After installing the system in the field, use the smart controller in the actual environment to calibrate the sensors (setting the reference values).
 
 ## ⚠️ Disclaimer
